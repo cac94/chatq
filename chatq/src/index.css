@@ -1,0 +1,9 @@
+@reference "tailwindcss";
+
+body {
+  @apply dark:bg-gray-900 min-h-screen;
+}
+
+#root {
+  @apply min-h-screen;
+}
