@@ -9,24 +9,26 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(false)
   const bottomRef = useRef(null)
   const inputContainerRef = useRef(null)
+  const qurl = 'http://localhost:8080/api/q' // Your API endpoint
 
   const handleSend = async () => {
     if (query.trim()) {
       setIsLoading(true)
       try {
-        // Replace this URL with your actual API endpoint
-        const response = await axios.get(`https://api.example.com/data?query=${encodeURIComponent(query)}`)
+        const response = await axios.post(qurl, {
+          sql: query
+        })
         
-        // Assuming the API returns an array of objects with data
-        const columns = Object.keys(response.data[0] || {}).map(key => ({
-          key,
-          label: key.charAt(0).toUpperCase() + key.slice(1) // Capitalize first letter
+        // Convert the response format to match our grid structure
+        const columns = response.data.columns.map(col => ({
+          key: col,
+          label: col.charAt(0).toUpperCase() + col.slice(1) // Capitalize first letter
         }))
 
         setGrids(prevGrids => [...prevGrids, {
           id: Date.now(),
           query: query,
-          data: response.data,
+          data: response.data.data,
           columns: columns
         }])
         
