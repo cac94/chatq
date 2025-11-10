@@ -28,9 +28,29 @@ public class QueryController {
     }
 
     @PostMapping("/chat")
+    public ResponseEntity<QueryResponse> executeChat(@RequestBody QueryRequest request) {
+        try {
+            QueryResponse response = queryService.executeChat(request.getConversationId(), request.getSql());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/chatq")
     public ResponseEntity<QueryResponse> executeChatQuery(@RequestBody QueryRequest request) {
         try {
-            QueryResponse response = queryService.executeChatQuery(request.getSql());
+            QueryResponse response = queryService.executeChatQuery(request.getConversationId(), request.getSql());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/new")
+    public ResponseEntity<QueryResponse> executeNewChat(@RequestBody QueryRequest request) {
+        try {
+            QueryResponse response = queryService.executeNewChat();
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();

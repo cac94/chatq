@@ -7,6 +7,7 @@ public class QueryResponse {
     private List<String> columns;
     private List<Map<String, Object>> data;
     private String message;
+    private String conversationId;
 
     public List<String> getColumns() {
         return columns;
@@ -30,5 +31,13 @@ public class QueryResponse {
 
     public void setMessage(String message) {
         this.message = message;
+    }
+
+    public String getConversationId() {
+        return conversationId;
+    }
+
+    public void setConversationId(String conversationId) {
+        this.conversationId = conversationId;
     }
 }
