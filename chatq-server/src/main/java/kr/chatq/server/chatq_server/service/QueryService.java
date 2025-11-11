@@ -40,6 +40,18 @@ public class QueryService {
     @Value("${spring.ai.ollama.chat.options.model}")
     private String aimodel;
 
+    @Value("${spring.ai.ollama.chat.options.temperature}")
+    private Double temperature;
+
+    @Value("${spring.ai.ollama.chat.options.num-predict}")
+    private Integer numPredict;
+
+    @Value("${spring.ai.ollama.chat.options.top-k}")
+    private Integer topK;
+
+    @Value("${spring.ai.ollama.chat.options.top-p}")
+    private Double topP;
+
     // Spring이 ChatModel (OllamaChatModel 구현체) 빈을 찾아서 주입
     public QueryService(ChatModel chatModel) {
         this.chatModel = chatModel;
@@ -139,14 +151,22 @@ public class QueryService {
     private String sendChatToOllama(String message) {
         OllamaOptions options = OllamaOptions.builder()
             .model(aimodel)
-            .temperature(0.3)
+            .temperature(temperature)
+            .numPredict(numPredict)
+            .topK(topK)
+            .topP(topP)
             .build();
 
         ChatResponse response = chatModel.call(new Prompt(message, options));
+        
         return response.getResult().getOutput().getText();
    }
+
    // private 메소드: Ollama에 문자열 보내고 결과 받기 (conversationId를 사용한 메모리 기능 포함)
     private String sendChatToOllama(String conversationId, String message) {
+        if (message == null) {
+            throw new IllegalArgumentException("message cannot be null");
+        }
         // 이전 대화 내역 가져오기
         List<Message> messages = conversationMemory.getOrDefault(conversationId, new ArrayList<>());
         messages = new ArrayList<>(messages); // 새 리스트 생성 (원본 보호)
@@ -157,7 +177,10 @@ public class QueryService {
         
         OllamaOptions options = OllamaOptions.builder()
             .model(aimodel)
-            .temperature(0.3)
+            .temperature(temperature)
+            .numPredict(numPredict)
+            .topK(topK)
+            .topP(topP)
             .build();
 
         // 메시지 히스토리와 함께 Prompt 생성
