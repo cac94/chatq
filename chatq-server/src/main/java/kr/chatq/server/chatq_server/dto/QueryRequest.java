@@ -1,15 +1,15 @@
 package kr.chatq.server.chatq_server.dto;
 
 public class QueryRequest {
-    private String sql;
+    private String prompt;
     private String conversationId;
 
-    public String getSql() {
-        return sql;
+    public String getPrompt() {
+        return prompt;
     }
 
-    public void setSql(String sql) {
-        this.sql = sql;
+    public void setPrompt(String prompt) {
+        this.prompt = prompt;
     }
 
     public String getConversationId() {

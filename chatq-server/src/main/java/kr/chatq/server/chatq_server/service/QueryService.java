@@ -3,18 +3,13 @@ package kr.chatq.server.chatq_server.service;
 import kr.chatq.server.chatq_server.dto.QueryResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.ai.ollama.api.OllamaOptions;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -108,16 +103,18 @@ public class QueryService {
         if (message == null) {
             throw new IllegalArgumentException("message cannot be null");
         }
-        String auth = getAuth();
-        List<Map<String, Object>> authTables = getAuthTables(auth);
-        String ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(message) : sendChatToOllama(conversationId, message);
+
+        PromptMakerService promptMakerService = new PromptMakerService(new DbService(jdbcTemplate));
+
+        String prompt = promptMakerService.getPickTablePrompt(getAuth(), message);
+
+        String ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(prompt) : sendChatToOllama(conversationId, prompt);
 
         QueryResponse response = new QueryResponse();
         response.setMessage(ollamaResponse);
 
         return response;
     }
-  
     
     public QueryResponse executeNewChat() {
         String auth = getAuth();
@@ -207,21 +204,5 @@ public class QueryService {
             }
         }
         return "GUEST";
-    }
-
-    // chatqauth 테이블에서 auth 칼럼이 auth인 것을 조회
-    public List<Map<String, Object>> getAuthTables(String auth) {
-        String sql = "SELECT * FROM chatqauth WHERE auth = ?";
-        return jdbcTemplate.query(sql, (rs, rowNum) -> {
-            Map<String, Object> row = new HashMap<>();
-            ResultSetMetaData metaData = rs.getMetaData();
-            int columnCount = metaData.getColumnCount();
-            
-            for (int i = 1; i <= columnCount; i++) {
-                String columnName = metaData.getColumnLabel(i);
-                row.put(columnName, rs.getObject(columnName));
-            }
-            return row;
-        }, auth);
     }
 }

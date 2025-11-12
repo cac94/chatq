@@ -20,7 +20,7 @@ public class QueryController {
     @PostMapping("/q")
     public ResponseEntity<QueryResponse> executeQuery(@RequestBody QueryRequest request) {
         try {
-            QueryResponse response = queryService.executeQuery(request.getSql());
+            QueryResponse response = queryService.executeQuery(request.getPrompt());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
@@ -30,7 +30,7 @@ public class QueryController {
     @PostMapping("/chat")
     public ResponseEntity<QueryResponse> executeChat(@RequestBody QueryRequest request) {
         try {
-            QueryResponse response = queryService.executeChat(request.getConversationId(), request.getSql());
+            QueryResponse response = queryService.executeChat(request.getConversationId(), request.getPrompt());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
@@ -40,7 +40,7 @@ public class QueryController {
     @PostMapping("/chatq")
     public ResponseEntity<QueryResponse> executeChatQuery(@RequestBody QueryRequest request) {
         try {
-            QueryResponse response = queryService.executeChatQuery(request.getConversationId(), request.getSql());
+            QueryResponse response = queryService.executeChatQuery(request.getConversationId(), request.getPrompt());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
