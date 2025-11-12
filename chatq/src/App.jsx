@@ -16,7 +16,7 @@ const App = () => {
       setIsLoading(true)
       try {
         const response = await axios.post(qurl, {
-          sql: query
+          prompt: query
         })
         
         // Convert the response format to match our grid structure
