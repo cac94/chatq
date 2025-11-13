@@ -21,6 +21,12 @@ const DataGrid = ({ data, columns }) => {
   }
 
   const isNumeric = (value) => {
+    if (value === null || value === undefined || value === '') return false
+    // left zero padding이 있으면 숫자로 취급하지 않음 (예: "001", "0123")
+    const strValue = String(value)
+    if (strValue.length > 1 && strValue[0] === '0' && /^\d+$/.test(strValue)) {
+      return false
+    }
     return !isNaN(parseFloat(value)) && isFinite(value)
   }
 
