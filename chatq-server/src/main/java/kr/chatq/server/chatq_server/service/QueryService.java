@@ -106,7 +106,9 @@ public class QueryService {
 
         PromptMakerService promptMakerService = new PromptMakerService(new DbService(jdbcTemplate));
 
-        String prompt = promptMakerService.getPickTablePrompt(getAuth(), message);
+        Map<String, Object> result = promptMakerService.getPickTablePrompt(getAuth(), message);
+        String prompt = (String) result.get("prompt");
+        Map<String, String> infos = (Map<String, String>) result.get("infos");
 
         String ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(prompt) : sendChatToOllama(conversationId, prompt);
 

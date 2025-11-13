@@ -34,28 +34,12 @@ public class DbService {
     }
 
     // chatqtable 테이블에서 table 정보 조회
-    @SuppressWarnings("null")
-    public List<Map<String, Object>> getTables(List<Map<String, Object>> authTables) {
-        if (authTables == null || authTables.isEmpty()) {
+    public List<Map<String, Object>> getTables(String auth, String metaYn) {
+        if (auth == null || auth.isEmpty()) {
             return List.of();
         }
         
-        // IN 절용 플레이스홀더 생성 (db_nm = ? AND table_nm = ?) OR (db_nm = ? AND table_nm = ?) ...
-        StringBuilder sqlBuilder = new StringBuilder("SELECT * FROM chatqtable WHERE ");
-        List<Object> params = new java.util.ArrayList<>();
-        
-        for (int i = 0; i < authTables.size(); i++) {
-            if (i > 0) {
-                sqlBuilder.append(" OR ");
-            }
-            sqlBuilder.append("(db_nm = ? AND table_nm = ?)");
-            
-            Map<String, Object> authTable = authTables.get(i);
-            params.add(authTable.get("db_nm"));
-            params.add(authTable.get("table_nm"));
-        }
-        
-        String sql = sqlBuilder.toString();
+        String sql = "SELECT a.* FROM chatqtable a INNER JOIN chatqauth b ON (a.db_nm = b.db_nm AND a.table_nm = b.table_nm) WHERE b.auth = ? and a.meta_yn = ?";
         
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Map<String, Object> row = new HashMap<>();
@@ -67,7 +51,7 @@ public class DbService {
                 row.put(columnName, rs.getObject(columnName));
             }
             return row;
-        }, params.toArray());
+        }, auth, metaYn);
     }
 
     // chatqauth 테이블에서 table_nm 칼럼이 tableNm인 것을 조회

@@ -20,15 +20,18 @@ public class PromptMakerService {
     }
 
     //쿼리문을 생성할 테이블 선택 프롬프트 생성
-    public String getPickTablePrompt(String auth, String message) {
-        List<Map<String, Object>> authTables = dbService.getAuthTables(auth);
-        //authTables 을 사용하여 getTables 호출
-        List<Map<String, Object>> tables = dbService.getTables(authTables);
+    public Map<String, Object> getPickTablePrompt(String auth, String message) {
+        Map<String, Object> result = new java.util.HashMap<>();
+        Map<String, String> infos = new java.util.HashMap<>();
+
+        String metaYn = (message.indexOf("[[meta]]") < 0) ? "N" : "Y";
+        List<Map<String, Object>> tables = dbService.getTables(auth, metaYn);
 
         //Promt 생성을 위한 StringBuilder
         StringBuilder promptBuilder = new StringBuilder();
         promptBuilder.append("다음은 정보종류별 조회sql문 json이다. {");
         for( Map<String, Object> table : tables ) {
+             StringBuilder queryBuilder = new StringBuilder();
             //table 정보로 getColumns 호출
             String dbName = table.get("db_nm").toString();
             String tableName = table.get("table_nm").toString();
@@ -42,6 +45,7 @@ public class PromptMakerService {
             }
 
             promptBuilder.append("\"__").append(tableAlias).append("__\": \"select ");
+            queryBuilder.append("select ");
 
             List<Map<String, Object>> columns = dbService.getColumns(dbName, tableName);
             //문자열을 담을 배열 변수 columnsList 선언
@@ -64,8 +68,11 @@ public class PromptMakerService {
                 columnsList.add(columnBuilder.toString());
             }
             promptBuilder.append(String.join(", ", columnsList));
+            queryBuilder.append(String.join(", ", columnsList));
 
             promptBuilder.append(" from ").append(tableName).append(" ").append(tailQuery).append("\",\n ");
+            queryBuilder.append(" from ").append(tableName).append(" ").append(tailQuery);
+            infos.put(tableAlias, queryBuilder.toString());
         }   
         promptBuilder.append("}\n [[").append(message).append("]]  문의에 가장 가까운 정보종류는?");
 
@@ -80,7 +87,9 @@ public class PromptMakerService {
 
         //콘솔 출력 
         System.out.println("PickTablePrompt Generated Prompt: " + prompt);
+        result.put("prompt", prompt);
+        result.put("infos", infos);
 
-        return prompt;
+        return result;
     }
 }
