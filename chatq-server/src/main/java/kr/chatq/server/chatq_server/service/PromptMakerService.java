@@ -1,5 +1,6 @@
 package kr.chatq.server.chatq_server.service;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -13,10 +14,12 @@ public class PromptMakerService {
     private static final Logger logger = LoggerFactory.getLogger(PromptMakerService.class);
  
     private DbService dbService;
+    private javax.sql.DataSource dataSource;
 
     //생성자
-    public PromptMakerService(DbService dbService) {
+    public PromptMakerService(DbService dbService, javax.sql.DataSource dataSource) {
         this.dbService = dbService;
+        this.dataSource = dataSource;
     }
 
     //쿼리문을 생성할 테이블 선택 프롬프트 생성
@@ -89,7 +92,44 @@ public class PromptMakerService {
         System.out.println("PickTablePrompt Generated Prompt: " + prompt);
         result.put("prompt", prompt);
         result.put("infos", infos);
+        result.put("tables", tables);
 
         return result;
+    }
+
+    public Map<String, Object> getQueryPrompt(String tableAlias, String baseQuery, String message) {
+        Map<String, Object> result = new java.util.HashMap<>();
+
+        StringBuilder promptBuilder = new StringBuilder();
+        promptBuilder.append("다음은 정보종류별 조회sql문 이다. {");
+        promptBuilder.append("\"__").append(tableAlias).append("__\": \"").append(baseQuery).append("\"");
+        try {
+            promptBuilder.append("}\n [[").append(message).append("]]  문의에 맞게 " + dbProductName() + " sql 문을 만들어 쿼리문만 표시해줘"); //.append(tableAlias).append("__ 만 사용해줘.");
+        } catch (SQLException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        String prompt = promptBuilder.toString();
+
+        // 프롬프트 로그 남기기
+        logger.info("===  QueryPrompt Generated Prompt ===");
+        logger.info("TableAlias: {}", tableAlias);
+        logger.info("BaseQuery: {}", baseQuery);
+        logger.info("Message: {}", message);
+        logger.info("Prompt:\n{}", prompt);
+        logger.info("========================");
+
+        //콘솔 출력 
+        System.out.println("QueryPrompt Generated Prompt: " + prompt);
+        result.put("prompt", prompt);
+
+        return result;
+    }
+
+    private String dbProductName() throws SQLException {
+        try (var conn = dataSource.getConnection()) {
+            return conn.getMetaData().getDatabaseProductName(); // 예: "MariaDB"
+        }
     }
 }

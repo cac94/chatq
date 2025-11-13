@@ -9,7 +9,7 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(false)
   const bottomRef = useRef(null)
   const inputContainerRef = useRef(null)
-  const qurl = 'http://localhost:8080/api/q' // Your API endpoint
+  const qurl = 'http://localhost:8080/api/chatq' // Your API endpoint
 
   const handleSend = async () => {
     if (query.trim()) {
@@ -51,7 +51,7 @@ const App = () => {
   return (
     <div className="min-h-screen w-full bg-slate-900">
       {/* Fixed header with input */}
-      <div className="sticky top-0 bg-slate-900 p-4 shadow-lg z-10" ref={inputContainerRef}>
+      <div className="sticky top-0 bg-slate-900 p-4 shadow-lg z-50" ref={inputContainerRef}>
         <div className="max-w-4xl mx-auto">
           <h1 className="text-4xl font-bold text-white mb-6 text-center">
             ChatQ
@@ -61,6 +61,11 @@ const App = () => {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isLoading) {
+                  handleSend()
+                }
+              }}
               placeholder="DB에서 조회하고 싶은 것을 물어보세요..."
               className="flex-1 p-3 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 focus:outline-none focus:border-slate-500"
             />

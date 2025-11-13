@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Modal from './Modal'
+import './DataGrid.css'
 
 const DataGrid = ({ data, columns }) => {
   const [selectedRow, setSelectedRow] = useState(null)
@@ -19,31 +20,43 @@ const DataGrid = ({ data, columns }) => {
     }
   }
 
+  const isNumeric = (value) => {
+    return !isNaN(parseFloat(value)) && isFinite(value)
+  }
+
   return (
-    <div className="grid gap-4">
-      {/* Headers */}
-      <div className={`grid grid-cols-${columns.length} gap-4 p-4 bg-slate-800 rounded-t-lg border-b border-slate-700`}>
-        {columns.map(col => (
-          <div key={col.key} className="font-semibold text-slate-200">{col.label}</div>
-        ))}
-      </div>
-      
-      {/* Rows */}
-      {data.map((row, index) => (
-        <div 
-          key={row.id}
-          onClick={() => handleRowClick(row)}
-          className={`grid grid-cols-${columns.length} gap-4 p-4 bg-slate-800 
-            ${index === data.length - 1 ? 'rounded-b-lg' : 'border-b border-slate-700'}
-            hover:bg-slate-700 cursor-pointer transition-colors`}
-        >
+    <div className="overflow-x-auto overflow-y-auto max-h-[67vh] custom-scrollbar">
+      <div className="min-w-max">
+        {/* Headers */}
+        <div className="flex gap-4 p-4 bg-slate-800 rounded-t-lg border-b border-slate-700 sticky top-0 z-10">
           {columns.map(col => (
-            <div key={col.key} className={col.key === 'status' ? getStatusColor(row[col.key]) : "text-slate-300"}>
-              {row[col.key]}
+            <div key={col.key} className="font-semibold text-slate-200 min-w-[150px] text-center">
+              {col.label}
             </div>
           ))}
         </div>
-      ))}
+        
+        {/* Rows */}
+        {data.map((row, index) => (
+          <div 
+            key={index}
+            onClick={() => handleRowClick(row)}
+            className={`flex gap-4 p-4 bg-slate-800 
+              ${index === data.length - 1 ? 'rounded-b-lg' : 'border-b border-slate-700'}
+              hover:bg-slate-700 cursor-pointer transition-colors`}
+          >
+            {columns.map(col => {
+              const value = row[col.key]
+              const isNum = isNumeric(value)
+              return (
+                <div key={col.key} className={`min-w-[150px] ${isNum ? 'text-right' : 'text-center'} ${col.key === 'status' ? getStatusColor(value) : "text-slate-300"}`}>
+                  {value}
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
 
       {/* Detail Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>

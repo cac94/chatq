@@ -56,7 +56,7 @@ public class DbService {
 
     // chatqauth 테이블에서 table_nm 칼럼이 tableNm인 것을 조회
     public List<Map<String, Object>> getColumns(String dbNm, String tableNm) {
-        String sql = "SELECT * FROM chatqcolumn WHERE db_nm = ? AND table_nm = ?";
+        String sql = "SELECT * FROM chatqcolumn WHERE db_nm = ? AND table_nm = ? order by column_order";
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Map<String, Object> row = new HashMap<>();
             ResultSetMetaData metaData = rs.getMetaData();
