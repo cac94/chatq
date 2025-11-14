@@ -36,21 +36,14 @@ public class PromptMakerService {
         for( Map<String, Object> table : tables ) {
              StringBuilder queryBuilder = new StringBuilder();
             //table 정보로 getColumns 호출
-            String dbName = table.get("db_nm").toString();
             String tableName = table.get("table_nm").toString();
             String tableAlias = table.get("table_alias").toString();
             String tailQuery = table.get("tail_query").toString();
-            String headerYn = table.get("header_yn").toString();
-
-            //headerYn 이 "Y" 면 continue
-            if(headerYn.equals("Y")) {
-                continue;
-            }
 
             promptBuilder.append("\"__").append(tableAlias).append("__\": \"select ");
             queryBuilder.append("select ");
 
-            List<Map<String, Object>> columns = dbService.getColumns(dbName, tableName);
+            List<Map<String, Object>> columns = dbService.getColumns(tableName);
             //문자열을 담을 배열 변수 columnsList 선언
             List<String> columnsList = new ArrayList<>();
             
