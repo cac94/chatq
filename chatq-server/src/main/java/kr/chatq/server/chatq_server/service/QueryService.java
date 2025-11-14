@@ -20,6 +20,7 @@ import jakarta.servlet.http.HttpSession;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -114,7 +115,7 @@ public class QueryService {
     }
 
     @SuppressWarnings("unchecked")
-    public QueryResponse executeChatQuery(String conversationId, String message) {
+    public QueryResponse executeChatQuery(String conversationId, String message) throws SQLException {
         if (message == null) {
             throw new IllegalArgumentException("message cannot be null");
         }
