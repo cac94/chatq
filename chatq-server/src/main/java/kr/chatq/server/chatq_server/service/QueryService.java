@@ -140,7 +140,7 @@ public class QueryService {
     }
 
     @SuppressWarnings("unchecked")
-    public QueryResponse executeChatQuery(String conversationId, String message) throws SQLException {
+    public QueryResponse executeChatQuery(String conversationId, String message) throws SQLException throws SQLException {
         String ollamaResponse;
         if (message == null) {
             throw new IllegalArgumentException("message cannot be null");
