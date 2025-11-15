@@ -29,6 +29,7 @@ public class PromptMakerService {
 
         String metaYn = (message.indexOf("[[meta]]") < 0) ? "N" : "Y";
         List<Map<String, Object>> tables = dbService.getTables(auth, metaYn);
+        List<String> tableAliasList = new ArrayList<>();
 
         //Promt 생성을 위한 StringBuilder
         StringBuilder promptBuilder = new StringBuilder();
@@ -39,6 +40,7 @@ public class PromptMakerService {
             String tableName = table.get("table_nm").toString();
             String tableAlias = table.get("table_alias").toString();
             String tailQuery = table.get("tail_query").toString();
+            tableAliasList.add("__" + tableAlias + "__");
 
             promptBuilder.append("\"__").append(tableAlias).append("__\": \"select ");
             queryBuilder.append("select ");
@@ -56,9 +58,9 @@ public class PromptMakerService {
 
                 StringBuilder columnBuilder = new StringBuilder();
                 if( subqueryYn.equals("Y") ) {
-                    columnBuilder.append("(").append(columnDesc).append(") as '").append(columnName).append("'");
+                    columnBuilder.append("(").append(columnDesc).append(") as `").append(columnName).append("`");
                 } else {
-                    columnBuilder.append(columnCd).append(" as '").append(columnName).append("'");
+                    columnBuilder.append(columnCd).append(" as `").append(columnName).append("`");
                 }
 
                 columnsList.add(columnBuilder.toString());
@@ -70,7 +72,8 @@ public class PromptMakerService {
             queryBuilder.append(" from ").append(tableName).append(" ").append(tailQuery);
             infos.put(tableAlias, queryBuilder.toString());
         }   
-        promptBuilder.append("}\n [[").append(message).append("]]  문의에 가장 가까운 정보종류는?");
+        promptBuilder.append("}\n 이 json 내용을 참고하여 [[").append(message).append("]]  문의에 가장 가까운 정보종류를 ")
+            .append(String.join(", ", tableAliasList)).append(" 중에서 어느 것인지 한 개만 골라줘.");
 
         String prompt = promptBuilder.toString();
         
@@ -90,18 +93,13 @@ public class PromptMakerService {
         return result;
     }
 
-    public Map<String, Object> getQueryPrompt(String tableAlias, String baseQuery, String message) {
+    public Map<String, Object> getQueryPrompt(String tableAlias, String baseQuery, String message) throws SQLException {
         Map<String, Object> result = new java.util.HashMap<>();
 
         StringBuilder promptBuilder = new StringBuilder();
-        promptBuilder.append("다음은 정보종류별 조회sql문 이다. {");
-        promptBuilder.append("\"__").append(tableAlias).append("__\": \"").append(baseQuery).append("\"");
-        try {
-            promptBuilder.append("}\n [[").append(message).append("]]  문의에 맞게 " + dbProductName() + " sql 문을 만들어 쿼리문만 표시해줘"); //.append(tableAlias).append("__ 만 사용해줘.");
-        } catch (SQLException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+        promptBuilder.append("다음은 " + dbProductName() + " sql문 이다. ").append("\"").append(baseQuery).append(";\"\n 이 sql문을 수정하여 [[")
+            // .append(message).append("]] 문의에 답변하기 위한 쿼리문을 작성해줘. 어떤 토큰 문자열(<|...|>)도 출력하지 말고 작성한 쿼리문만 답해줘.");
+            .append(message).append("]] 문의에 답변하기 위한 쿼리문을 작성해줘. 날짜형식은 'YYYY-MM-DD'이고 column alias는 유지해줘. 작성한 쿼리문만 출력해줘.");
 
         String prompt = promptBuilder.toString();
 
@@ -121,8 +119,9 @@ public class PromptMakerService {
     }
 
     private String dbProductName() throws SQLException {
-        try (var conn = dataSource.getConnection()) {
-            return conn.getMetaData().getDatabaseProductName(); // 예: "MariaDB"
-        }
+        var conn = dataSource.getConnection();
+        String productName = conn.getMetaData().getDatabaseProductName();
+        conn.close();
+        return productName; // 예: "MariaDB"
     }
 }

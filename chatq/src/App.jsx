@@ -54,7 +54,16 @@ const App = () => {
       {/* Fixed header with input */}
       <div className="sticky top-0 bg-slate-900 p-4 shadow-lg z-50" ref={inputContainerRef}>
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-bold text-white mb-6 text-center flex items-center justify-center gap-3">
+          <h1
+            className="text-4xl font-bold text-white mb-6 text-center flex items-center justify-center gap-3 cursor-pointer select-none hover:opacity-90"
+            role="button"
+            tabIndex={0}
+            title="클릭하면 그리드 초기화"
+            onClick={() => setGrids([])}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') setGrids([])
+            }}
+          >
             <img src={chatqLogo} alt="ChatQ Logo" className="h-8 w-8" />
             ChatQ
           </h1>
@@ -103,34 +112,47 @@ const App = () => {
             <div key={grid.id} className="bg-slate-800 p-4 rounded-lg">
               <div className="text-slate-300 mb-4 font-medium flex items-center justify-between">
                 <span>Query: {grid.query}</span>
-                <button
-                  onClick={() => {
-                    // Excel export logic will go here
-                    const csv = [
-                      grid.columns.map(col => col.label).join(','),
-                      ...grid.data.map(row => 
-                        grid.columns.map(col => {
-                          const value = row[col.key]
-                          return typeof value === 'string' && value.includes(',') 
-                            ? `"${value}"` 
-                            : value
-                        }).join(',')
-                      )
-                    ].join('\n')
-                    
-                    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-                    const link = document.createElement('a')
-                    link.href = URL.createObjectURL(blob)
-                    link.download = `chatq_${grid.id}.csv`
-                    link.click()
-                  }}
-                  className="p-2 hover:bg-slate-700 rounded-md transition-colors text-green-500 hover:text-green-400"
-                  title="Excel로 다운로드"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-0">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(grid.query)
+                    }}
+                    className="p-1 hover:bg-slate-700 rounded-md transition-colors text-slate-400 hover:text-slate-300"
+                    title="쿼리 복사"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Excel export logic will go here
+                      const csv = [
+                        grid.columns.map(col => col.label).join(','),
+                        ...grid.data.map(row => 
+                          grid.columns.map(col => {
+                            const value = row[col.key]
+                            return typeof value === 'string' && value.includes(',') 
+                              ? `"${value}"` 
+                              : value
+                          }).join(',')
+                        )
+                      ].join('\n')
+                      
+                      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+                      const link = document.createElement('a')
+                      link.href = URL.createObjectURL(blob)
+                      link.download = `chatq_${grid.id}.csv`
+                      link.click()
+                    }}
+                    className="p-1 hover:bg-slate-700 rounded-md transition-colors text-green-500 hover:text-green-400"
+                    title="Excel로 다운로드"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </button>
+                </div>
               </div>
               <DataGrid data={grid.data} columns={grid.columns} />
             </div>

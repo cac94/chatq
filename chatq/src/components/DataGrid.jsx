@@ -36,7 +36,7 @@ const DataGrid = ({ data, columns }) => {
         {/* Headers */}
         <div className="flex gap-4 p-4 bg-slate-800 rounded-t-lg border-b border-slate-700 sticky top-0 z-10">
           {columns.map(col => (
-            <div key={col.key} className="font-semibold text-slate-200 min-w-[150px] text-center">
+            <div key={col.key} className="font-semibold text-slate-200 w-[150px] flex-shrink-0 text-center truncate">
               {col.label}
             </div>
           ))}
@@ -55,7 +55,11 @@ const DataGrid = ({ data, columns }) => {
               const value = row[col.key]
               const isNum = isNumeric(value)
               return (
-                <div key={col.key} className={`min-w-[150px] ${isNum ? 'text-right' : 'text-center'} ${col.key === 'status' ? getStatusColor(value) : "text-slate-300"}`}>
+                <div 
+                  key={col.key} 
+                  className={`w-[150px] flex-shrink-0 truncate ${isNum ? 'text-right' : 'text-center'} ${col.key === 'status' ? getStatusColor(value) : "text-slate-300"}`}
+                  title={value}
+                >
                   {value}
                 </div>
               )

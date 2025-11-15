@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.ollama.api.OllamaOptions;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -20,6 +21,7 @@ import jakarta.servlet.http.HttpSession;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -54,6 +56,23 @@ public class QueryService {
 
     @Value("${spring.ai.ollama.chat.options.top-p}")
     private Double topP;
+
+    // OpenAI 설정
+    @Value("${spring.ai.openai.api-key:}")
+    private String openAiApiKey;
+
+    @Value("${spring.ai.openai.chat.options.model:gpt-4o-mini}")
+    private String openAiModel;
+
+    @Value("${spring.ai.openai.chat.options.temperature:0.0}")
+    private Double openAiTemperature;
+
+    @Value("${spring.ai.openai.chat.options.max-tokens:1024}")
+    private Integer openAiMaxTokens;
+
+    // Spring AI type (ollama or openai)
+    @Value("${spring.ai.type:ollama}")
+    private String aiType;
 
     // Spring이 ChatModel (OllamaChatModel 구현체) 빈을 찾아서 주입
     public QueryService(ChatModel chatModel) {
@@ -102,10 +121,17 @@ public class QueryService {
     }
     
     public QueryResponse executeChat(String conversationId,String message) {
+        String ollamaResponse;
         if (message == null) {
             throw new IllegalArgumentException("message cannot be null");
         }
-        String ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(message) : sendChatToOllama(conversationId, message);
+
+        //aiType에 따라 OpenAI 또는 Ollama로 분기
+        if ("openai".equalsIgnoreCase(aiType)) {
+            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(message) : sendChatToOpenAI(conversationId, message);
+        } else {
+            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(message) : sendChatToOllama(conversationId, message);
+        }
 
         QueryResponse response = new QueryResponse();
         response.setMessage(ollamaResponse);
@@ -114,7 +140,8 @@ public class QueryService {
     }
 
     @SuppressWarnings("unchecked")
-    public QueryResponse executeChatQuery(String conversationId, String message) {
+    public QueryResponse executeChatQuery(String conversationId, String message) throws SQLException {
+        String ollamaResponse;
         if (message == null) {
             throw new IllegalArgumentException("message cannot be null");
         }
@@ -126,7 +153,11 @@ public class QueryService {
         String prompt = (String) result.get("prompt");
         Map<String, String> infos = (Map<String, String>) result.get("infos");
 
-        String ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(prompt) : sendChatToOllama(conversationId, prompt);
+        if ("openai".equalsIgnoreCase(aiType)) {
+            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(prompt) : sendChatToOpenAI(conversationId, prompt);
+        } else {    
+            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(prompt) : sendChatToOllama(conversationId, prompt);
+        }
 
         //logging ollamaResponse
         System.out.println("Ollama Response: " + ollamaResponse);
@@ -150,7 +181,12 @@ public class QueryService {
 
         Map<String, Object> queryPromptResult = promptMakerService.getQueryPrompt(tableAlias, baseQuery, message);
         String queryPrompt = (String) queryPromptResult.get("prompt");
-        ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(queryPrompt) : sendChatToOllama(conversationId, queryPrompt);
+
+        if ("openai".equalsIgnoreCase(aiType)) {
+            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(queryPrompt) : sendChatToOpenAI(conversationId, queryPrompt);
+        } else {
+            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(queryPrompt) : sendChatToOllama(conversationId, queryPrompt);
+        }
 
         //logging ollamaResponse
         System.out.println("Ollama Response: " + ollamaResponse);
@@ -232,6 +268,12 @@ public class QueryService {
         if (m.find()) {
             return m.group(1).trim();
         }
+
+        // ';' 없는 경우 SELECT부터 끝까지 반환
+        int selectIndex = text.toLowerCase().indexOf("select");
+        if (selectIndex != -1) {
+            return text.substring(selectIndex).trim();
+        }
         return null;
     }
     
@@ -262,6 +304,61 @@ public class QueryService {
         
         return sanitizeResponse(rawText);
    }
+
+   // private 메소드: OpenAI에 문자열 보내고 결과 받기
+    private String sendChatToOpenAI(String message) {
+        if (openAiApiKey == null || openAiApiKey.isEmpty()) {
+            throw new IllegalStateException("OpenAI API key is not configured. Set spring.ai.openai.api-key in application.properties");
+        }
+
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+            .model(openAiModel)
+            .temperature(openAiTemperature)
+            .maxTokens(openAiMaxTokens)
+            .build();
+
+        ChatResponse response = chatModel.call(new Prompt(message, options));
+        String rawText = response.getResult().getOutput().getText();
+        
+        return sanitizeResponse(rawText);
+    }
+
+    // private 메소드: OpenAI에 문자열 보내고 결과 받기 (conversationId를 사용한 메모리 기능 포함)
+    private String sendChatToOpenAI(String conversationId, String message) {
+        if (openAiApiKey == null || openAiApiKey.isEmpty()) {
+            throw new IllegalStateException("OpenAI API key is not configured. Set spring.ai.openai.api-key in application.properties");
+        }
+        
+        if (message == null) {
+            throw new IllegalArgumentException("message cannot be null");
+        }
+        
+        // 이전 대화 내역 가져오기
+        List<Message> messages = conversationMemory.getOrDefault(conversationId, new ArrayList<>());
+        messages = new ArrayList<>(messages); // 새 리스트 생성 (원본 보호)
+        
+        // 현재 사용자 메시지 추가
+        UserMessage userMessage = new UserMessage(message);
+        messages.add(userMessage);
+        
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+            .model(openAiModel)
+            .temperature(openAiTemperature)
+            .maxTokens(openAiMaxTokens)
+            .build();
+
+        // 메시지 히스토리와 함께 Prompt 생성
+        ChatResponse response = chatModel.call(new Prompt(messages, options));
+        
+        // AI 응답을 메시지 리스트에 추가
+        messages.add(response.getResult().getOutput());
+        
+        // 업데이트된 대화 내역을 메모리에 저장
+        conversationMemory.put(conversationId, messages);
+        String rawText = response.getResult().getOutput().getText();
+        
+        return sanitizeResponse(rawText);
+    }
 
    // private 메소드: Ollama에 문자열 보내고 결과 받기 (conversationId를 사용한 메모리 기능 포함)
     private String sendChatToOllama(String conversationId, String message) {
