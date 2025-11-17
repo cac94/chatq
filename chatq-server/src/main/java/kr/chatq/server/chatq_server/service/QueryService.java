@@ -12,7 +12,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.ollama.api.OllamaOptions;
+import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -33,7 +35,8 @@ import java.util.regex.Pattern;
 public class QueryService {
 
     private static final Logger logger = LoggerFactory.getLogger(PromptMakerService.class);
-    private final ChatModel chatModel;
+    private final OllamaChatModel chatModel;
+    private final OpenAiChatModel openAiChatModel;
 
     // 대화 메모리를 저장할 Map (conversationId -> 메시지 리스트)
     private final Map<String, List<Message>> conversationMemory = new HashMap<>();
@@ -67,16 +70,25 @@ public class QueryService {
     @Value("${spring.ai.openai.chat.options.temperature:0.0}")
     private Double openAiTemperature;
 
-    @Value("${spring.ai.openai.chat.options.max-tokens:1024}")
+    @Value("${spring.ai.openai.chat.options.max-completion-tokens:1024}")
     private Integer openAiMaxTokens;
+
+    // OpenAI reasoning effort (none|low|medium|high)
+    @Value("${spring.ai.openai.chat.options.reasoning-effort:}")
+    private String openAiReasoningEffort;
+
+    // OpenAI output verbosity (low|medium|high)
+    @Value("${spring.ai.openai.chat.options.verbosity:}")
+    private String openAiVerbosity;
 
     // Spring AI type (ollama or openai)
     @Value("${spring.ai.type:ollama}")
     private String aiType;
 
-    // Spring이 ChatModel (OllamaChatModel 구현체) 빈을 찾아서 주입
-    public QueryService(ChatModel chatModel) {
+    // Spring이 ChatModel (Ollama 또는 기본 ChatModel) 빈을 찾아서 주입
+    public QueryService(OllamaChatModel chatModel, OpenAiChatModel openAiChatModel) {
         this.chatModel = chatModel;
+        this.openAiChatModel = openAiChatModel;
     }
 
     @Autowired
@@ -312,12 +324,11 @@ public class QueryService {
         }
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
-            .model(openAiModel)
-            .temperature(openAiTemperature)
-            .maxTokens(openAiMaxTokens)
+            .temperature(1.0)
             .build();
 
-        ChatResponse response = chatModel.call(new Prompt(message, options));
+        ChatModel model = (openAiChatModel != null) ? openAiChatModel : chatModel;
+        ChatResponse response = model.call(new Prompt(message, options));
         String rawText = response.getResult().getOutput().getText();
         
         return sanitizeResponse(rawText);
@@ -341,14 +352,13 @@ public class QueryService {
         UserMessage userMessage = new UserMessage(message);
         messages.add(userMessage);
         
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
-            .model(openAiModel)
-            .temperature(openAiTemperature)
-            .maxTokens(openAiMaxTokens)
+       OpenAiChatOptions options = OpenAiChatOptions.builder()
+            .temperature(1.0)
             .build();
 
         // 메시지 히스토리와 함께 Prompt 생성
-        ChatResponse response = chatModel.call(new Prompt(messages, options));
+        ChatModel model = (openAiChatModel != null) ? openAiChatModel : chatModel;
+        ChatResponse response = model.call(new Prompt(messages, options));
         
         // AI 응답을 메시지 리스트에 추가
         messages.add(response.getResult().getOutput());
