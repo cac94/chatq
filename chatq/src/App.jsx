@@ -25,12 +25,21 @@ const App = () => {
           key: col,
           label: col.charAt(0).toUpperCase() + col.slice(1) // Capitalize first letter
         }))
+        const headerColumns = response.data.headerColumns 
+          ? response.data.headerColumns.map(col => ({
+              key: col,
+              label: col.charAt(0).toUpperCase() + col.slice(1) // Capitalize first letter
+            }))
+          : []
 
         setGrids(prevGrids => [...prevGrids, {
           id: Date.now(),
           query: query,
           data: response.data.data,
-          columns: columns
+          columns: columns,
+          headerColumns: headerColumns,
+          headerData: response.data.headerData,
+          detailYn: response.data.detailYn
         }])
         
         setQuery('') // Clear input after sending
@@ -154,7 +163,13 @@ const App = () => {
                   </button>
                 </div>
               </div>
-              <DataGrid data={grid.data} columns={grid.columns} />
+              <DataGrid 
+                data={grid.data} 
+                columns={grid.columns} 
+                headerData={grid.headerData}
+                headerColumns={grid.headerColumns}
+                detailYn={grid.detailYn}  
+              />
             </div>
           ))}
           <div ref={bottomRef} />

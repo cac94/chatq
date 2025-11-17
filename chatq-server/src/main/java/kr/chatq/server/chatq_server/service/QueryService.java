@@ -26,8 +26,11 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -97,7 +100,7 @@ public class QueryService {
     @Autowired
     private javax.sql.DataSource dataSource;
 
-    public QueryResponse executeQuery(String sql) {
+    public QueryResponse executeQuery(String sql, String detailYn, List<String> headerColumnList) {
         if (sql == null) {
             throw new IllegalArgumentException("SQL query cannot be null");
         }
@@ -127,7 +130,26 @@ public class QueryService {
                 data.add(row);
             }
             response.setData(data);
-            
+            if("Y".equalsIgnoreCase(detailYn) && headerColumnList != null && !headerColumnList.isEmpty()) {
+                // 헤더용 컬럼만 추출
+                List<Map<String, Object>> headerData = new ArrayList<>();
+                for (Map<String, Object> row : data) {
+                    Map<String, Object> headerRow = new HashMap<>();
+                    for (String headerColumn : headerColumnList) {
+                        if (row.containsKey(headerColumn)) {
+                            headerRow.put(headerColumn, row.get(headerColumn));
+                        }
+                    }
+                    headerData.add(headerRow);
+                }
+                // 헤더 데이터 중복데이터는 제거하되 원래 순서 유지
+                Set<Map<String, Object>> uniqueHeaderData = new LinkedHashSet<>(headerData);  
+                response.setHeaderData(new ArrayList<>(uniqueHeaderData));
+                response.setHeaderColumns(headerColumnList);
+                response.setDetailYn("Y");
+            }else{
+                response.setDetailYn("N");
+            }
             return response;
         });
     }
@@ -172,8 +194,8 @@ public class QueryService {
         }
 
         //logging ollamaResponse
-        System.out.println("Ollama Response: " + ollamaResponse);
-        logger.info("Ollama Response: {}", ollamaResponse);
+        System.out.println(aiType + " Response: " + ollamaResponse);
+        logger.info("{} Response: {}", aiType, ollamaResponse);
 
         // 선택된 테이블의 alias 추출 후 기본 쿼리 가져오기
         String tableAlias = extractBetweenDoubleUnderscores(ollamaResponse);
@@ -190,6 +212,8 @@ public class QueryService {
         }
         String tableQuery = selectedTable != null ? (String) selectedTable.get("table_query") : null;
         String tableName = selectedTable != null ? (String) selectedTable.get("table_nm") : null;
+        String detailYn = selectedTable != null ? (String) selectedTable.get("detail_yn") : null;
+        List<String> headerColumnList = selectedTable != null ? (List<String>) selectedTable.get("headerColumns") : null;
 
         Map<String, Object> queryPromptResult = promptMakerService.getQueryPrompt(tableAlias, baseQuery, message);
         String queryPrompt = (String) queryPromptResult.get("prompt");
@@ -201,8 +225,8 @@ public class QueryService {
         }
 
         //logging ollamaResponse
-        System.out.println("Ollama Response: " + ollamaResponse);
-        logger.info("Ollama Response: {}", ollamaResponse);
+        System.out.println(aiType + " Response: " + ollamaResponse);
+        logger.info("{} Response: {}", aiType, ollamaResponse);
 
         // SQL문 추출
         String sql = extractSqlFromMarkdown(ollamaResponse);
@@ -216,7 +240,7 @@ public class QueryService {
                 sql = sql.replace(tableName, tableQuery);
             }
 
-            return executeQuery(sql);
+            return executeQuery(sql, detailYn, headerColumnList);
         }
 
         QueryResponse response = new QueryResponse();

@@ -2,13 +2,34 @@ import { useState } from 'react'
 import Modal from './Modal'
 import './DataGrid.css'
 
-const DataGrid = ({ data, columns }) => {
-  const [selectedRow, setSelectedRow] = useState(null)
+const DataGrid = ({ data, columns, headerData, headerColumns, detailYn }) => {
+  const [selectedRows, setSelectedRows] = useState([])
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null })
 
-  const handleRowClick = (row) => {
-    setSelectedRow(row)
-    setIsModalOpen(true)
+  const handleHeaderClick = (columnKey) => {
+    let direction = 'asc'
+    if (sortConfig.key === columnKey && sortConfig.direction === 'asc') {
+      direction = 'desc'
+    }
+    setSortConfig({ key: columnKey, direction })
+  }
+
+  const handleRowClick = (row, rowIndex) => {
+    // detailYn이 Y가 아니면 아무것도 하지 않음
+    if (detailYn !== 'Y') {
+      return
+    }
+    
+    // detailYn이 Y이면 헤더 row 의 각 column별 값이 동일한 모든 데이터를 data에서 찾아 그리드로 표시
+    if (data && headerColumns) {
+      // headerColumns의 모든 키에 대해 row의 값과 일치하는 data 행들을 필터링
+      const matchingRows = data.filter(dataRow => {
+        return headerColumns.every(col => dataRow[col.key] === row[col.key])
+      })
+      setSelectedRows(matchingRows)
+      setIsModalOpen(true)
+    }
   }
 
   const getStatusColor = (status) => {
@@ -30,28 +51,66 @@ const DataGrid = ({ data, columns }) => {
     return !isNaN(parseFloat(value)) && isFinite(value)
   }
 
+  // detailYn이 Y이면 headerColumns와 headerData 사용, 아니면 기존 columns와 data 사용
+  const displayColumns = detailYn === 'Y' && headerColumns ? headerColumns : columns
+  let displayData = detailYn === 'Y' && headerData ? headerData : data
+
+  // 정렬 적용
+  if (sortConfig.key !== null && displayData) {
+    displayData = [...displayData].sort((a, b) => {
+      const aValue = a[sortConfig.key]
+      const bValue = b[sortConfig.key]
+      
+      // null/undefined 처리
+      if (aValue === null || aValue === undefined) return 1
+      if (bValue === null || bValue === undefined) return -1
+      
+      // 숫자 비교
+      if (isNumeric(aValue) && isNumeric(bValue)) {
+        const diff = parseFloat(aValue) - parseFloat(bValue)
+        return sortConfig.direction === 'asc' ? diff : -diff
+      }
+      
+      // 문자열 비교
+      const comparison = String(aValue).localeCompare(String(bValue))
+      return sortConfig.direction === 'asc' ? comparison : -comparison
+    })
+  }
+
+  const getSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) {
+      return null
+    }
+    return sortConfig.direction === 'asc' ? ' ▲' : ' ▼'
+  }
+
   return (
     <div className="overflow-x-auto overflow-y-auto max-h-[67vh] custom-scrollbar">
       <div className="min-w-max">
         {/* Headers */}
         <div className="flex gap-4 p-4 bg-slate-800 rounded-t-lg border-b border-slate-700 sticky top-0 z-10">
-          {columns.map(col => (
-            <div key={col.key} className="font-semibold text-slate-200 w-[150px] flex-shrink-0 text-center truncate">
-              {col.label}
+          {displayColumns.map(col => (
+            <div 
+              key={col.key} 
+              className="font-semibold text-slate-200 w-[150px] flex-shrink-0 text-center truncate cursor-pointer hover:text-blue-400 transition-colors select-none"
+              onClick={() => handleHeaderClick(col.key)}
+              title="클릭하여 정렬"
+            >
+              {col.label}{getSortIcon(col.key)}
             </div>
           ))}
         </div>
         
         {/* Rows */}
-        {data.map((row, index) => (
+        {displayData.map((row, index) => (
           <div 
             key={index}
-            onClick={() => handleRowClick(row)}
+            onClick={() => handleRowClick(row, index)}
             className={`flex gap-4 p-4 bg-slate-800 
-              ${index === data.length - 1 ? 'rounded-b-lg' : 'border-b border-slate-700'}
+              ${index === displayData.length - 1 ? 'rounded-b-lg' : 'border-b border-slate-700'}
               hover:bg-slate-700 cursor-pointer transition-colors`}
           >
-            {columns.map(col => {
+            {displayColumns.map(col => {
               const value = row[col.key]
               const isNum = isNumeric(value)
               return (
@@ -70,25 +129,42 @@ const DataGrid = ({ data, columns }) => {
 
       {/* Detail Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        {selectedRow && (
+        {selectedRows.length > 0 && (
           <div className="text-slate-200">
-            <h2 className="text-2xl font-bold mb-4">User Details</h2>
-            <div className="grid gap-4">
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-700 rounded-lg">
-                <div className="font-semibold">ID:</div>
-                <div>{selectedRow.id}</div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-700 rounded-lg">
-                <div className="font-semibold">Name:</div>
-                <div>{selectedRow.name}</div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-700 rounded-lg">
-                <div className="font-semibold">Email:</div>
-                <div>{selectedRow.email}</div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-700 rounded-lg">
-                <div className="font-semibold">Status:</div>
-                <div className={getStatusColor(selectedRow.status)}>{selectedRow.status}</div>
+            <h2 className="text-2xl font-bold mb-4">상세 정보 ({selectedRows.length}건)</h2>
+            <div className="overflow-x-auto overflow-y-auto max-h-[60vh] custom-scrollbar">
+              <div className="min-w-max">
+                {/* Modal Headers */}
+                <div className="flex gap-4 p-4 bg-slate-700 rounded-t-lg border-b border-slate-600 sticky top-0 z-10">
+                  {columns.map(col => (
+                    <div key={col.key} className="font-semibold text-slate-200 w-[150px] flex-shrink-0 text-center truncate">
+                      {col.label}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Modal Rows */}
+                {selectedRows.map((row, index) => (
+                  <div 
+                    key={index}
+                    className={`flex gap-4 p-4 bg-slate-700 
+                      ${index === selectedRows.length - 1 ? 'rounded-b-lg' : 'border-b border-slate-600'}`}
+                  >
+                    {columns.map(col => {
+                      const value = row[col.key]
+                      const isNum = isNumeric(value)
+                      return (
+                        <div 
+                          key={col.key} 
+                          className={`w-[150px] flex-shrink-0 truncate ${isNum ? 'text-right' : 'text-center'} ${col.key === 'status' ? getStatusColor(value) : "text-slate-300"}`}
+                          title={value}
+                        >
+                          {value}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))}
               </div>
             </div>
           </div>

@@ -40,14 +40,15 @@ public class PromptMakerService {
             String tableName = table.get("table_nm").toString();
             String tableAlias = table.get("table_alias").toString();
             String tailQuery = table.get("tail_query").toString();
-            tableAliasList.add("__" + tableAlias + "__");
+            tableAliasList.add("`__" + tableAlias + "__`");
 
             promptBuilder.append("\"__").append(tableAlias).append("__\": \"select ");
             queryBuilder.append("select ");
 
             List<Map<String, Object>> columns = dbService.getColumns(tableName);
-            //문자열을 담을 배열 변수 columnsList 선언
-            List<String> columnsList = new ArrayList<>();
+            //문자열을 담을 배열 변수 columnList 선언
+            List<String> columnList = new ArrayList<>();
+            List<String> headerColumnList = new ArrayList<>();
             
             for( int i = 0; i < columns.size(); i++ ) {
                 Map<String, Object> column = columns.get(i);
@@ -55,6 +56,7 @@ public class PromptMakerService {
                 String columnName = column.get("column_nm") != null ? column.get("column_nm").toString() : "";
                 String columnDesc = column.get("column_desc") != null ? column.get("column_desc").toString() : "";
                 String subqueryYn = column.get("subquery_yn") != null ? column.get("subquery_yn").toString() : "N";
+                String headerColumnYn = column.get("header_column_yn") != null ? column.get("header_column_yn").toString() : "N";
 
                 StringBuilder columnBuilder = new StringBuilder();
                 if( subqueryYn.equals("Y") ) {
@@ -63,16 +65,21 @@ public class PromptMakerService {
                     columnBuilder.append(columnCd).append(" as `").append(columnName).append("`");
                 }
 
-                columnsList.add(columnBuilder.toString());
+                columnList.add(columnBuilder.toString());
+
+                if( headerColumnYn.equals("Y") ) {
+                    headerColumnList.add(columnName);
+                }
             }
-            promptBuilder.append(String.join(", ", columnsList));
-            queryBuilder.append(String.join(", ", columnsList));
+            promptBuilder.append(String.join(", ", columnList));
+            queryBuilder.append(String.join(", ", columnList));
 
             promptBuilder.append(" from ").append(tableName).append(" ").append(tailQuery).append("\",\n ");
             queryBuilder.append(" from ").append(tableName).append(" ").append(tailQuery);
             infos.put(tableAlias, queryBuilder.toString());
+            table.put("headerColumns", headerColumnList);
         }   
-        promptBuilder.append("}\n 이 json 내용을 참고하여 [[").append(message).append("]]  문의에 가장 가까운 정보종류를 ")
+        promptBuilder.append("}\\n 이 json 내용을 참고하여 [[").append(message).append("]]  문의에 가장 가까운 정보종류를 ")
             .append(String.join(", ", tableAliasList)).append(" 중에서 어느 것인지 한 개만 골라줘.");
 
         String prompt = promptBuilder.toString();
@@ -97,9 +104,9 @@ public class PromptMakerService {
         Map<String, Object> result = new java.util.HashMap<>();
 
         StringBuilder promptBuilder = new StringBuilder();
-        promptBuilder.append("다음은 " + dbProductName() + " sql문 이다. ").append("\"").append(baseQuery).append(";\"\n 이 sql문을 수정하여 [[")
+        promptBuilder.append("```sql\\n").append(baseQuery).append(";\\n```\\n 앞의 sql문을 수정하여 [[")
             // .append(message).append("]] 문의에 답변하기 위한 쿼리문을 작성해줘. 어떤 토큰 문자열(<|...|>)도 출력하지 말고 작성한 쿼리문만 답해줘.");
-            .append(message).append("]] 문의에 답변하기 위한 쿼리문을 작성해줘. 날짜형식은 'YYYY-MM-DD'이고 column alias는 유지해줘. 작성한 쿼리문만 출력해줘.");
+            .append(message).append("]] 문의에 답변하기 위한 ").append(dbProductName()).append(" 쿼리문을 작성해줘. 날짜형식은 'YYYY-MM-DD'이고 column alias는 유지해줘. 작성한 쿼리문만 출력해줘.");
 
         String prompt = promptBuilder.toString();
 
