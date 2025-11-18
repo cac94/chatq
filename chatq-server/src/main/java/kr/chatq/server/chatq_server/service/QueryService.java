@@ -187,8 +187,9 @@ public class QueryService {
     }
 
     @SuppressWarnings("unchecked")
-    public QueryResponse executeChatQuery(String conversationId, String message, String detailYn, String baseQuery, String tableQuery, String tableName, List<String> headerColumns) throws SQLException {
+    public QueryResponse executeChatQuery(String conversationId, String message, String detailYn, String lastQuery, String tableQuery, String tableName, List<String> headerColumns) throws SQLException {
         String ollamaResponse;
+        String baseQuery;
         if (message == null) {
             throw new IllegalArgumentException("message cannot be null");
         }
@@ -199,12 +200,10 @@ public class QueryService {
         Map<String, Object> result = promptMakerService.getPickTablePrompt(getAuth(), message);
         String prompt = (String) result.get("prompt");
         
-        if( baseQuery != null && !baseQuery.isEmpty() ) {
+        if( lastQuery != null && !lastQuery.isEmpty() ) {
             tableQuery = decrypt(tableQuery);
-            baseQuery = decrypt(baseQuery);
+            baseQuery = decrypt(lastQuery);
         }else{
-            baseQuery = null;
-
             Map<String, String> infos = (Map<String, String>) result.get("infos");
 
             if ("openai".equalsIgnoreCase(aiType)) {
@@ -258,7 +257,7 @@ public class QueryService {
         if (sql != null && !sql.isEmpty()) {
             sql = sanitizeResponse(sql);
             //sql을 암호화해서 String lastQuery에 저장
-            String encSql = encrypt(sql);
+            String encSql = encrypt((lastQuery == null || lastQuery.isEmpty()) ? sql : lastQuery);
             logger.debug("Encrypted SQL generated, length={}", (encSql != null ? encSql.length() : 0));
             
             if(tableQuery != null && !tableQuery.isEmpty()) {
@@ -270,6 +269,9 @@ public class QueryService {
             queryResponse.setLastQuery(encSql);
             queryResponse.setTableQuery(encrypt(tableQuery));
             queryResponse.setTableName(tableName);
+            if(detailYn != null && !detailYn.isEmpty()) {
+                queryResponse.setDetailYn(detailYn);
+            }
 
             return queryResponse;
         }
