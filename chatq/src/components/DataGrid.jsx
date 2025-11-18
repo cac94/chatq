@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Modal from './Modal'
 import './DataGrid.css'
 
@@ -6,6 +6,8 @@ const DataGrid = ({ data, columns, headerData, headerColumns, detailYn }) => {
   const [selectedRows, setSelectedRows] = useState([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null })
+  const [columnWidths, setColumnWidths] = useState({})
+  const [resizingColumn, setResizingColumn] = useState(null)
 
   const handleHeaderClick = (columnKey) => {
     let direction = 'asc'
@@ -84,6 +86,34 @@ const DataGrid = ({ data, columns, headerData, headerColumns, detailYn }) => {
     return sortConfig.direction === 'asc' ? ' ▲' : ' ▼'
   }
 
+  const handleResizeStart = (e, columnKey) => {
+    e.stopPropagation()
+    setResizingColumn({ key: columnKey, startX: e.clientX, startWidth: columnWidths[columnKey] || 150 })
+  }
+
+  const handleResizeMove = (e) => {
+    if (!resizingColumn) return
+    const diff = e.clientX - resizingColumn.startX
+    const newWidth = Math.max(50, resizingColumn.startWidth + diff)
+    setColumnWidths({ ...columnWidths, [resizingColumn.key]: newWidth })
+  }
+
+  const handleResizeEnd = () => {
+    setResizingColumn(null)
+  }
+
+  // Add event listeners for resize
+  useEffect(() => {
+    if (resizingColumn) {
+      document.addEventListener('mousemove', handleResizeMove)
+      document.addEventListener('mouseup', handleResizeEnd)
+      return () => {
+        document.removeEventListener('mousemove', handleResizeMove)
+        document.removeEventListener('mouseup', handleResizeEnd)
+      }
+    }
+  }, [resizingColumn])
+
   return (
     <div className="overflow-x-auto overflow-y-auto max-h-[67vh] custom-scrollbar">
       <div className="min-w-max">
@@ -92,11 +122,16 @@ const DataGrid = ({ data, columns, headerData, headerColumns, detailYn }) => {
           {displayColumns.map(col => (
             <div 
               key={col.key} 
-              className="font-semibold text-slate-200 w-[150px] flex-shrink-0 text-center truncate cursor-pointer hover:text-blue-400 transition-colors select-none"
+              className="font-semibold text-slate-200 flex-shrink-0 text-center cursor-pointer hover:text-blue-400 transition-colors select-none relative overflow-hidden text-sm"
+              style={{ width: `${columnWidths[col.key] || 150}px` }}
               onClick={() => handleHeaderClick(col.key)}
               title="클릭하여 정렬"
             >
               {col.label}{getSortIcon(col.key)}
+              <div
+                className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500"
+                onMouseDown={(e) => handleResizeStart(e, col.key)}
+              />
             </div>
           ))}
         </div>
@@ -116,7 +151,8 @@ const DataGrid = ({ data, columns, headerData, headerColumns, detailYn }) => {
               return (
                 <div 
                   key={col.key} 
-                  className={`w-[150px] flex-shrink-0 truncate ${isNum ? 'text-right' : 'text-center'} ${col.key === 'status' ? getStatusColor(value) : "text-slate-300"}`}
+                  className={`flex-shrink-0 overflow-hidden text-sm ${isNum ? 'text-right' : 'text-center'} ${col.key === 'status' ? getStatusColor(value) : "text-slate-300"}`}
+                  style={{ width: `${columnWidths[col.key] || 150}px` }}
                   title={value}
                 >
                   {value}
@@ -137,8 +173,16 @@ const DataGrid = ({ data, columns, headerData, headerColumns, detailYn }) => {
                 {/* Modal Headers */}
                 <div className="flex gap-4 p-4 bg-slate-700 rounded-t-lg border-b border-slate-600 sticky top-0 z-10">
                   {columns.map(col => (
-                    <div key={col.key} className="font-semibold text-slate-200 w-[150px] flex-shrink-0 text-center truncate">
+                    <div 
+                      key={col.key} 
+                      className="font-semibold text-slate-200 flex-shrink-0 text-center overflow-hidden relative"
+                      style={{ width: `${columnWidths[col.key] || 150}px` }}
+                    >
                       {col.label}
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500"
+                        onMouseDown={(e) => handleResizeStart(e, col.key)}
+                      />
                     </div>
                   ))}
                 </div>
@@ -156,7 +200,8 @@ const DataGrid = ({ data, columns, headerData, headerColumns, detailYn }) => {
                       return (
                         <div 
                           key={col.key} 
-                          className={`w-[150px] flex-shrink-0 truncate ${isNum ? 'text-right' : 'text-center'} ${col.key === 'status' ? getStatusColor(value) : "text-slate-300"}`}
+                          className={`flex-shrink-0 overflow-hidden ${isNum ? 'text-right' : 'text-center'} ${col.key === 'status' ? getStatusColor(value) : "text-slate-300"}`}
+                          style={{ width: `${columnWidths[col.key] || 150}px` }}
                           title={value}
                         >
                           {value}
