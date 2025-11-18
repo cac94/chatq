@@ -43,7 +43,15 @@ public class QueryController {
     @PostMapping("/chatq")
     public ResponseEntity<QueryResponse> executeChatQuery(@RequestBody QueryRequest request) {
         try {
-            QueryResponse response = queryService.executeChatQuery(request.getConversationId(), request.getPrompt());
+            QueryResponse response = queryService.executeChatQuery(
+                request.getConversationId(), 
+                request.getPrompt(), 
+                request.getDetailYn(), 
+                request.getLastQuery(), 
+                request.getTableQuery(), 
+                request.getTableName(), 
+                request.getHeaderColumns()
+            );
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();

@@ -24,15 +24,21 @@ import jakarta.servlet.http.HttpSession;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 @Service
 public class QueryService {
@@ -88,6 +94,13 @@ public class QueryService {
     @Value("${spring.ai.type:ollama}")
     private String aiType;
 
+    // Encryption secret for reversible encryption (AES-GCM)
+    @Value("${chatq.encrypt.secret:chatq-default-secret-key-32-bytes!!}")
+    private String encryptSecret;
+
+    private static final int GCM_TAG_LENGTH = 128; // bits
+    private static final int IV_LENGTH = 12; // bytes
+
     // Spring이 ChatModel (Ollama 또는 기본 ChatModel) 빈을 찾아서 주입
     public QueryService(OllamaChatModel chatModel, OpenAiChatModel openAiChatModel) {
         this.chatModel = chatModel;
@@ -130,7 +143,7 @@ public class QueryService {
                 data.add(row);
             }
             response.setData(data);
-            if("Y".equalsIgnoreCase(detailYn) && headerColumnList != null && !headerColumnList.isEmpty()) {
+            if("Y".equalsIgnoreCase(detailYn) && headerColumnList != null && !headerColumnList.isEmpty() && headerColumnList.size() <= columnCount ) {
                 // 헤더용 컬럼만 추출
                 List<Map<String, Object>> headerData = new ArrayList<>();
                 for (Map<String, Object> row : data) {
@@ -174,7 +187,7 @@ public class QueryService {
     }
 
     @SuppressWarnings("unchecked")
-    public QueryResponse executeChatQuery(String conversationId, String message) throws SQLException {
+    public QueryResponse executeChatQuery(String conversationId, String message, String detailYn, String baseQuery, String tableQuery, String tableName, List<String> headerColumns) throws SQLException {
         String ollamaResponse;
         if (message == null) {
             throw new IllegalArgumentException("message cannot be null");
@@ -185,37 +198,45 @@ public class QueryService {
 
         Map<String, Object> result = promptMakerService.getPickTablePrompt(getAuth(), message);
         String prompt = (String) result.get("prompt");
-        Map<String, String> infos = (Map<String, String>) result.get("infos");
+        
+        if( baseQuery != null && !baseQuery.isEmpty() ) {
+            tableQuery = decrypt(tableQuery);
+            baseQuery = decrypt(baseQuery);
+        }else{
+            baseQuery = null;
 
-        if ("openai".equalsIgnoreCase(aiType)) {
-            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(prompt) : sendChatToOpenAI(conversationId, prompt);
-        } else {    
-            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(prompt) : sendChatToOllama(conversationId, prompt);
-        }
+            Map<String, String> infos = (Map<String, String>) result.get("infos");
 
-        //logging ollamaResponse
-        System.out.println(aiType + " Response: " + ollamaResponse);
-        logger.info("{} Response: {}", aiType, ollamaResponse);
-
-        // 선택된 테이블의 alias 추출 후 기본 쿼리 가져오기
-        String tableAlias = extractBetweenDoubleUnderscores(ollamaResponse);
-        String baseQuery = infos.get(tableAlias);
-
-        List<Map<String, Object>> tables = (List<Map<String, Object>>) result.get("tables");
-        // tables 에서 tab_alias가 tableAlias인 항목 찾기
-        Map<String, Object> selectedTable = null;
-        for (Map<String, Object> table : tables) {
-            if (tableAlias.equals(table.get("table_alias"))) {
-                selectedTable = table;
-                break;
+            if ("openai".equalsIgnoreCase(aiType)) {
+                ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(prompt) : sendChatToOpenAI(conversationId, prompt);
+            } else {    
+                ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(prompt) : sendChatToOllama(conversationId, prompt);
             }
-        }
-        String tableQuery = selectedTable != null ? (String) selectedTable.get("table_query") : null;
-        String tableName = selectedTable != null ? (String) selectedTable.get("table_nm") : null;
-        String detailYn = selectedTable != null ? (String) selectedTable.get("detail_yn") : null;
-        List<String> headerColumnList = selectedTable != null ? (List<String>) selectedTable.get("headerColumns") : null;
 
-        Map<String, Object> queryPromptResult = promptMakerService.getQueryPrompt(tableAlias, baseQuery, message);
+            //logging ollamaResponse
+            System.out.println(aiType + " Response: " + ollamaResponse);
+            logger.info("{} Response: {}", aiType, ollamaResponse);
+
+            // 선택된 테이블의 alias 추출 후 기본 쿼리 가져오기
+            String tableAlias = extractBetweenDoubleUnderscores(ollamaResponse);
+            baseQuery = infos.get(tableAlias);
+
+            List<Map<String, Object>> tables = (List<Map<String, Object>>) result.get("tables");
+            // tables 에서 tab_alias가 tableAlias인 항목 찾기
+            Map<String, Object> selectedTable = null;
+            for (Map<String, Object> table : tables) {
+                if (tableAlias.equals(table.get("table_alias"))) {
+                    selectedTable = table;
+                    break;
+                }
+            }
+            tableQuery = selectedTable != null ? (String) selectedTable.get("table_query") : null;
+            tableName = selectedTable != null ? (String) selectedTable.get("table_nm") : null;
+            detailYn = selectedTable != null ? (String) selectedTable.get("detail_yn") : null;
+            headerColumns = selectedTable != null ? (List<String>) selectedTable.get("headerColumns") : null;
+        }
+
+        Map<String, Object> queryPromptResult = promptMakerService.getQueryPrompt(baseQuery, message);
         String queryPrompt = (String) queryPromptResult.get("prompt");
 
         if ("openai".equalsIgnoreCase(aiType)) {
@@ -236,11 +257,21 @@ public class QueryService {
         }
         if (sql != null && !sql.isEmpty()) {
             sql = sanitizeResponse(sql);
+            //sql을 암호화해서 String lastQuery에 저장
+            String encSql = encrypt(sql);
+            logger.debug("Encrypted SQL generated, length={}", (encSql != null ? encSql.length() : 0));
+            
             if(tableQuery != null && !tableQuery.isEmpty()) {
                 sql = sql.replace(tableName, tableQuery);
             }
 
-            return executeQuery(sql, detailYn, headerColumnList);
+            QueryResponse queryResponse = executeQuery(sql, detailYn, headerColumns);
+            queryResponse.setMessage(ollamaResponse);
+            queryResponse.setLastQuery(encSql);
+            queryResponse.setTableQuery(encrypt(tableQuery));
+            queryResponse.setTableName(tableName);
+
+            return queryResponse;
         }
 
         QueryResponse response = new QueryResponse();
@@ -441,5 +472,58 @@ public class QueryService {
             }
         }
         return "GUEST";
+    }
+
+    // AES-GCM encryption (reversible)
+    private String encrypt(String plainText) {
+        if (plainText == null) return null;
+        try {
+            byte[] keyBytes = Arrays.copyOf(encryptSecret.getBytes(StandardCharsets.UTF_8), 32); // 256-bit
+            SecretKeySpec key = new SecretKeySpec(keyBytes, "AES");
+
+            byte[] iv = new byte[IV_LENGTH];
+            new SecureRandom().nextBytes(iv);
+
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+            cipher.init(Cipher.ENCRYPT_MODE, key, spec);
+
+            byte[] cipherText = cipher.doFinal(plainText.getBytes(StandardCharsets.UTF_8));
+
+            byte[] combined = new byte[iv.length + cipherText.length];
+            System.arraycopy(iv, 0, combined, 0, iv.length);
+            System.arraycopy(cipherText, 0, combined, iv.length, cipherText.length);
+
+            return Base64.getEncoder().encodeToString(combined);
+        } catch (Exception e) {
+            logger.error("Encryption failed", e);
+            return null;
+        }
+    }
+
+    // AES-GCM decryption helper (for future use)
+    @SuppressWarnings("unused")
+    private String decrypt(String encBase64) {
+        if (encBase64 == null) return null;
+        try {
+            byte[] combined = Base64.getDecoder().decode(encBase64);
+            if (combined.length < IV_LENGTH + 1) return null;
+
+            byte[] iv = Arrays.copyOfRange(combined, 0, IV_LENGTH);
+            byte[] cipherText = Arrays.copyOfRange(combined, IV_LENGTH, combined.length);
+
+            byte[] keyBytes = Arrays.copyOf(encryptSecret.getBytes(StandardCharsets.UTF_8), 32); // 256-bit
+            SecretKeySpec key = new SecretKeySpec(keyBytes, "AES");
+
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+            cipher.init(Cipher.DECRYPT_MODE, key, spec);
+
+            byte[] plain = cipher.doFinal(cipherText);
+            return new String(plain, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            logger.error("Decryption failed", e);
+            return null;
+        }
     }
 }

@@ -100,7 +100,7 @@ public class PromptMakerService {
         return result;
     }
 
-    public Map<String, Object> getQueryPrompt(String tableAlias, String baseQuery, String message) throws SQLException {
+    public Map<String, Object> getQueryPrompt(String baseQuery, String message) throws SQLException {
         Map<String, Object> result = new java.util.HashMap<>();
 
         StringBuilder promptBuilder = new StringBuilder();
@@ -112,7 +112,6 @@ public class PromptMakerService {
 
         // 프롬프트 로그 남기기
         logger.info("===  QueryPrompt Generated Prompt ===");
-        logger.info("TableAlias: {}", tableAlias);
         logger.info("BaseQuery: {}", baseQuery);
         logger.info("Message: {}", message);
         logger.info("Prompt:\n{}", prompt);

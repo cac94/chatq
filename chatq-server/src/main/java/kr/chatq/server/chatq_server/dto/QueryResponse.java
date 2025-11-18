@@ -3,6 +3,7 @@ package kr.chatq.server.chatq_server.dto;
 import java.util.List;
 import java.util.Map;
 
+
 public class QueryResponse {
     private List<String> columns;
     private List<Map<String, Object>> data;
@@ -11,6 +12,17 @@ public class QueryResponse {
     private String message;
     private String conversationId;
     private String detailYn;
+    private String lastQuery;
+    private String tableQuery;
+    private String tableName;
+
+    public String getTableName() {
+        return tableName;
+    }
+
+    public void setTableName(String tableName) {
+        this.tableName = tableName;
+    }
 
     public List<String> getColumns() {
         return columns;
@@ -66,5 +78,21 @@ public class QueryResponse {
 
     public void setHeaderData(List<Map<String, Object>> headerData) {
         this.headerData = headerData;
+    }
+
+    public String getLastQuery() {
+        return lastQuery;
+    }
+
+    public void setLastQuery(String lastQuery) {
+        this.lastQuery = lastQuery;
+    }
+
+    public String getTableQuery() {
+        return tableQuery;
+    }
+
+    public void setTableQuery(String tableQuery) {
+        this.tableQuery = tableQuery;
     }
 }

@@ -12,20 +12,34 @@ const App = () => {
   const inputContainerRef = useRef(null)
   const qurl = 'http://localhost:8080/api/chatq' // Your API endpoint
 
+  // Store lastQuery and tableQuery from previous response
+  const [lastQuery, setLastQuery] = useState(null)
+  const [tableQuery, setTableQuery] = useState(null)
+  const [detailYn, setDetailYn] = useState(null)
+  const [tableName, setTableName] = useState(null)
+  const [headerColumns, setHeaderColumns] = useState(null)
+
   const handleSend = async () => {
     if (query.trim()) {
       setIsLoading(true)
       try {
-        const response = await axios.post(qurl, {
+        const postData = {
           prompt: query
-        })
-        
+        }
+        if (lastQuery) postData.lastQuery = lastQuery
+        if (tableQuery) postData.tableQuery = tableQuery
+        if (detailYn) postData.detailYn = detailYn
+        if (tableName) postData.tableName = tableName
+        if (headerColumns) postData.headerColumns = headerColumns
+
+        const response = await axios.post(qurl, postData)
+
         // Convert the response format to match our grid structure
         const columns = response.data.columns.map(col => ({
           key: col,
           label: col.charAt(0).toUpperCase() + col.slice(1) // Capitalize first letter
         }))
-        const headerColumns = response.data.headerColumns 
+        const headerColumnsData = response.data.headerColumns 
           ? response.data.headerColumns.map(col => ({
               key: col,
               label: col.charAt(0).toUpperCase() + col.slice(1) // Capitalize first letter
@@ -37,15 +51,22 @@ const App = () => {
           query: query,
           data: response.data.data,
           columns: columns,
-          headerColumns: headerColumns,
+          headerColumns: headerColumnsData,
           headerData: response.data.headerData,
           detailYn: response.data.detailYn
         }])
-        
+
+        // Save lastQuery and tableQuery for next request
+        setLastQuery(response.data.lastQuery || null)
+        setTableQuery(response.data.tableQuery || null)
+        setDetailYn(response.data.detailYn || null)
+        setTableName(response.data.tableName || null)
+        setHeaderColumns(response.data.headerColumns || null)
+
         setQuery('') // Clear input after sending
       } catch (error) {
         console.error('API Error:', error)
-        // You might want to show an error message to the user here
+        alert('조회를 실패했습니다.')
       } finally {
         setIsLoading(false)
       }
@@ -67,10 +88,24 @@ const App = () => {
             className="text-4xl font-bold text-white mb-6 text-center flex items-center justify-center gap-3 cursor-pointer select-none hover:opacity-90"
             role="button"
             tabIndex={0}
-            title="클릭하면 그리드 초기화"
-            onClick={() => setGrids([])}
+            title="새 ChatQ 시작"
+            onClick={() => {
+              setGrids([])
+              setLastQuery(null)
+              setTableQuery(null)
+              setDetailYn(null)
+              setTableName(null)
+              setHeaderColumns(null)
+            }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') setGrids([])
+              if (e.key === 'Enter' || e.key === ' ') {
+                setGrids([])
+                setLastQuery(null)
+                setTableQuery(null)
+                setDetailYn(null)
+                setTableName(null)
+                setHeaderColumns(null)
+              }
             }}
           >
             <img src={chatqLogo} alt="ChatQ Logo" className="h-8 w-8" />
