@@ -66,7 +66,7 @@ const App = () => {
         setQuery('') // Clear input after sending
       } catch (error) {
         console.error('API Error:', error)
-        alert('조회를 실패했습니다.')
+        alert('조회를 실패했습니다. 좀 더 구체적으로 입력해보시거나 상단의 ChatQ 로고를 클릭하여 새로 시작해보세요.')
       } finally {
         setIsLoading(false)
       }
