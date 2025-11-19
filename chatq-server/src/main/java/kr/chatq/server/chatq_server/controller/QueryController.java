@@ -1,5 +1,7 @@
 package kr.chatq.server.chatq_server.controller;
 
+import kr.chatq.server.chatq_server.dto.LoginRequest;
+import kr.chatq.server.chatq_server.dto.LoginResponse;
 import kr.chatq.server.chatq_server.dto.QueryRequest;
 import kr.chatq.server.chatq_server.dto.QueryResponse;
 import kr.chatq.server.chatq_server.service.QueryService;
@@ -66,6 +68,17 @@ public class QueryController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+        try {
+            LoginResponse response = queryService.processLogin(request.getUser(), request.getPassword());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            LoginResponse response = new LoginResponse("FAIL", null, null, null, null);
+            return ResponseEntity.ok(response);
         }
     }
 }

@@ -1,5 +1,6 @@
 package kr.chatq.server.chatq_server.service;
 
+import kr.chatq.server.chatq_server.dto.LoginResponse;
 import kr.chatq.server.chatq_server.dto.QueryResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -545,6 +546,37 @@ public class QueryService {
         } catch (Exception e) {
             logger.error("Decryption failed", e);
             return null;
+        }
+    }
+
+    /**
+     * 로그인 처리
+     * @param user 사용자 아이디
+     * @param password 비밀번호
+     * @return LoginResponse
+     */
+    public LoginResponse processLogin(String user, String password) {
+        // TODO: 실제 구현시 DB에서 사용자 정보 조회 및 암호화된 비밀번호 검증 필요
+        
+        // 임시 하드코딩된 로그인 검증
+        if ("admin".equals(user) && "password".equals(password)) {
+            return new LoginResponse(
+                "SUCCESS",
+                "ADMIN",
+                Arrays.asList("사용자관리", "데이터조회", "시스템설정"),
+                "1",
+                "관리자"
+            );
+        } else if ("user".equals(user) && "user123".equals(password)) {
+            return new LoginResponse(
+                "SUCCESS",
+                "USER",
+                Arrays.asList("데이터조회"),
+                "2",
+                "일반사용자"
+            );
+        } else {
+            return new LoginResponse("FAIL", null, null, null, null);
         }
     }
 }

@@ -2,15 +2,27 @@ import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import './App.css'
 import DataGrid from './components/DataGrid'
+import Modal from './components/Modal'
+import UserInfoModal from './components/UserInfoModal'
 import chatqLogo from './assets/chatqicon51x51.png'
+
+const API_BASE_URL = 'http://localhost:8080'
 
 const App = () => {
   const [grids, setGrids] = useState([])
   const [query, setQuery] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [showUserInfoModal, setShowUserInfoModal] = useState(false)
+  const [showAlert, setShowAlert] = useState(false)
+  const [alertMessage, setAlertMessage] = useState('')
+  const [auth, setAuth] = useState('GUEST')
+  const [infos, setInfos] = useState(null)
+  const [level, setLevel] = useState(9)
+  const [userName, setUserName] = useState(null)
   const bottomRef = useRef(null)
   const inputContainerRef = useRef(null)
-  const qurl = 'http://localhost:8080/api/chatq' // Your API endpoint
+  const qurl = `${API_BASE_URL}/api/chatq` // Your API endpoint
 
   // Store lastQuery and tableQuery from previous response
   const [lastQuery, setLastQuery] = useState(null)
@@ -19,6 +31,41 @@ const App = () => {
   const [tableName, setTableName] = useState(null)
   const [headerColumns, setHeaderColumns] = useState(null)
   const [lastColumns, setLastColumns] = useState(null)
+
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    const formData = new FormData(e.target)
+    const username = formData.get('username')
+    const password = formData.get('password')
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/login`, {
+        user: username,
+        password:password
+      })
+
+      // 응답 메시지 확인
+      if (response.data.message === 'FAIL') {
+        setAlertMessage('로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.')
+        setShowAlert(true)
+        return
+      }
+
+      // 응답 데이터 저장
+      setAuth(response.data.auth)
+      setInfos(response.data.infos)
+      setLevel(response.data.level)
+      setUserName(response.data.user_name)
+      
+      setShowLoginModal(false)
+      setAlertMessage(`${response.data.user_name}님 환영합니다!`)
+      setShowAlert(true)
+    } catch (error) {
+      console.error('Login Error:', error)
+      setAlertMessage('로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.')
+      setShowAlert(true)
+    }
+  }
 
   const handleSend = async () => {
     if (query.trim()) {
@@ -71,7 +118,8 @@ const App = () => {
         setQuery('') // Clear input after sending
       } catch (error) {
         console.error('API Error:', error)
-        alert('조회를 실패했습니다. 좀 더 구체적으로 입력해보시거나 상단의 ChatQ 로고를 클릭하여 새로 시작해보세요.')
+        setAlertMessage('조회를 실패했습니다. 좀 더 구체적으로 입력해보시거나 상단의 ChatQ 로고를 클릭하여 새로 시작해보세요.')
+        setShowAlert(true)
       } finally {
         setIsLoading(false)
       }
@@ -88,6 +136,23 @@ const App = () => {
     <div className="min-h-screen w-full bg-slate-900">
       {/* Fixed header with input */}
       <div className="sticky top-0 bg-slate-900 p-4 shadow-lg z-50" ref={inputContainerRef}>
+        <div className="absolute top-4 right-4">
+          <button
+            className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+            onClick={() => {
+              if (userName) {
+                setShowUserInfoModal(true)
+              } else {
+                setShowLoginModal(true)
+              }
+            }}
+            title={userName ? "사용자 정보" : "로그인"}
+          >
+            <svg className="h-6 w-6 text-slate-300 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </button>
+        </div>
         <div className="max-w-4xl mx-auto">
           <h1
             className="text-4xl font-bold text-white mb-6 text-center flex items-center justify-center gap-3 cursor-pointer select-none hover:opacity-90"
@@ -217,6 +282,93 @@ const App = () => {
           <div ref={bottomRef} />
         </div>
       </div>
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <Modal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
+          <div className="w-96 mx-auto">
+            <h2 className="text-2xl font-bold text-white mb-6 text-center">로그인</h2>
+            <form onSubmit={handleLogin}>
+              <div className="mb-4">
+                <label className="block text-slate-300 mb-2">아이디</label>
+                <input
+                  type="text"
+                  name="username"
+                  className="w-full p-2 rounded bg-slate-700 text-white border border-slate-600 focus:outline-none focus:border-blue-500"
+                  placeholder="아이디를 입력하세요"
+                  required
+                />
+              </div>
+              <div className="mb-6">
+                <label className="block text-slate-300 mb-2">비밀번호</label>
+                <input
+                  type="password"
+                  name="password"
+                  className="w-full p-2 rounded bg-slate-700 text-white border border-slate-600 focus:outline-none focus:border-blue-500"
+                  placeholder="비밀번호를 입력하세요"
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                >
+                  로그인
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLoginModal(false)}
+                  className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
+                >
+                  취소
+                </button>
+              </div>
+            </form>
+          </div>
+        </Modal>
+      )}
+
+      {/* Alert Modal */}
+      {showAlert && (
+        <Modal isOpen={showAlert} onClose={() => setShowAlert(false)}>
+          <div className="w-96 mx-auto">
+            <div className="flex flex-col items-center">
+              <div className="mb-4">
+                <svg className="h-12 w-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="text-white text-center mb-6 whitespace-pre-line">{alertMessage}</p>
+              <button
+                onClick={() => setShowAlert(false)}
+                className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* User Info Modal */}
+      <UserInfoModal
+        isOpen={showUserInfoModal}
+        onClose={() => setShowUserInfoModal(false)}
+        userName={userName}
+        auth={auth}
+        level={level}
+        infos={infos}
+        onLogout={() => {
+          setAuth(null)
+          setInfos(null)
+          setLevel(null)
+          setUserName(null)
+          setShowUserInfoModal(false)
+          setAlertMessage('로그아웃되었습니다.')
+          setShowAlert(true)
+        }}
+      />
     </div>
   )
 }
