@@ -9,12 +9,14 @@ public class QueryResponse {
     private List<Map<String, Object>> data;
     private List<String> headerColumns;
     private List<Map<String, Object>> headerData;
+    private List<String> lastColumns;
     private String message;
     private String conversationId;
     private String detailYn;
     private String lastQuery;
     private String tableQuery;
     private String tableName;
+    private String lastDetailYn;
 
     public String getTableName() {
         return tableName;
@@ -38,6 +40,14 @@ public class QueryResponse {
 
     public void setData(List<Map<String, Object>> data) {
         this.data = data;
+    }
+
+    public List<String> getLastColumns() {
+        return lastColumns;
+    }
+
+    public void setLastColumns(List<String> lastColumns) {
+        this.lastColumns = lastColumns;
     }
 
     public String getMessage() {
@@ -94,5 +104,13 @@ public class QueryResponse {
 
     public void setTableQuery(String tableQuery) {
         this.tableQuery = tableQuery;
+    }
+
+    public String getLastDetailYn() {
+        return lastDetailYn;
+    }
+
+    public void setLastDetailYn(String lastDetailYn) {
+        this.lastDetailYn = lastDetailYn;
     }
 }

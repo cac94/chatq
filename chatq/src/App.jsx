@@ -15,9 +15,10 @@ const App = () => {
   // Store lastQuery and tableQuery from previous response
   const [lastQuery, setLastQuery] = useState(null)
   const [tableQuery, setTableQuery] = useState(null)
-  const [detailYn, setDetailYn] = useState(null)
+  const [lastDetailYn, setLastDetailYn] = useState(null)
   const [tableName, setTableName] = useState(null)
   const [headerColumns, setHeaderColumns] = useState(null)
+  const [lastColumns, setLastColumns] = useState(null)
 
   const handleSend = async () => {
     if (query.trim()) {
@@ -28,9 +29,10 @@ const App = () => {
         }
         if (lastQuery) postData.lastQuery = lastQuery
         if (tableQuery) postData.tableQuery = tableQuery
-        if (detailYn) postData.detailYn = detailYn
+        if (lastDetailYn) postData.lastDetailYn = lastDetailYn
         if (tableName) postData.tableName = tableName
         if (headerColumns) postData.headerColumns = headerColumns
+        if (lastColumns) postData.lastColumns = lastColumns
 
         const response = await axios.post(qurl, postData)
 
@@ -59,9 +61,12 @@ const App = () => {
         // Save lastQuery and tableQuery for next request
         setLastQuery(response.data.lastQuery || null)
         setTableQuery(response.data.tableQuery || null)
-        setDetailYn(response.data.detailYn || null)
+        setLastDetailYn(response.data.lastDetailYn || null)
         setTableName(response.data.tableName || null)
-        setHeaderColumns(response.data.headerColumns || null)
+        if (response.data.headerColumns && response.data.headerColumns.length > 0) {
+          setHeaderColumns(response.data.headerColumns)
+        }
+        setLastColumns(response.data.lastColumns || null)
 
         setQuery('') // Clear input after sending
       } catch (error) {
@@ -96,6 +101,7 @@ const App = () => {
               setDetailYn(null)
               setTableName(null)
               setHeaderColumns(null)
+              setLastColumns(null)
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -105,6 +111,7 @@ const App = () => {
                 setDetailYn(null)
                 setTableName(null)
                 setHeaderColumns(null)
+                setLastColumns(null)
               }
             }}
           >

@@ -5,11 +5,12 @@ import java.util.List;
 public class QueryRequest {
     private String prompt;
     private String conversationId;
-    private String detailYn;
+    private String lastDetailYn;
     private String lastQuery;
     private String tableQuery;
     private String tableName;
     private List<String> headerColumns;
+    private List<String> lastColumns;
 
     public String getPrompt() {
         return prompt;
@@ -27,12 +28,12 @@ public class QueryRequest {
         this.conversationId = conversationId;
     }
 
-    public String getDetailYn() {
-        return detailYn;
+    public String getLastDetailYn() {
+        return lastDetailYn;
     }
 
-    public void setDetailYn(String detailYn) {
-        this.detailYn = detailYn;
+    public void setLastDetailYn(String lastDetailYn) {
+        this.lastDetailYn = lastDetailYn;
     }
 
     public String getLastQuery() {
@@ -65,5 +66,13 @@ public class QueryRequest {
 
     public void setHeaderColumns(List<String> headerColumns) {
         this.headerColumns = headerColumns;
+    }
+
+    public List<String> getLastColumns() {
+        return lastColumns;
+    }
+
+    public void setLastColumns(List<String> lastColumns) {
+        this.lastColumns = lastColumns;
     }
 }

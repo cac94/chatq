@@ -187,23 +187,24 @@ public class QueryService {
     }
 
     @SuppressWarnings("unchecked")
-    public QueryResponse executeChatQuery(String conversationId, String message, String detailYn, String lastQuery, String tableQuery, String tableName, List<String> headerColumns) throws SQLException {
+    public QueryResponse executeChatQuery(String conversationId, String message, String lastDetailYn, String lastQuery, String tableQuery, String tableName, List<String> headerColumns, List<String> lastColumns) throws SQLException {
         String ollamaResponse;
         String baseQuery;
+        String detailYn = lastDetailYn;
         if (message == null) {
             throw new IllegalArgumentException("message cannot be null");
         }
 
         // 문의에 맞는 테이블을 고르는 프롬프트 생성
         PromptMakerService promptMakerService = new PromptMakerService(new DbService(jdbcTemplate), dataSource);
-
-        Map<String, Object> result = promptMakerService.getPickTablePrompt(getAuth(), message);
-        String prompt = (String) result.get("prompt");
         
-        if( lastQuery != null && !lastQuery.isEmpty() ) {
+        if( lastQuery != null && !lastQuery.isEmpty() ) { // 이전 쿼리가 있으면 복호화
             tableQuery = decrypt(tableQuery);
             baseQuery = decrypt(lastQuery);
-        }else{
+            lastQuery = baseQuery;
+        }else{ // 이전 쿼리가 없으면 테이블 선택 프롬프트 실행
+            Map<String, Object> result = promptMakerService.getPickTablePrompt(getAuth(), message);
+            String prompt = (String) result.get("prompt");
             Map<String, String> infos = (Map<String, String>) result.get("infos");
 
             if ("openai".equalsIgnoreCase(aiType)) {
@@ -235,6 +236,7 @@ public class QueryService {
             headerColumns = selectedTable != null ? (List<String>) selectedTable.get("headerColumns") : null;
         }
 
+        // 최종 쿼리 프롬프트 생성
         Map<String, Object> queryPromptResult = promptMakerService.getQueryPrompt(baseQuery, message);
         String queryPrompt = (String) queryPromptResult.get("prompt");
 
@@ -254,30 +256,47 @@ public class QueryService {
             // 여러 개의 SQL 추출 시도
             sql = extractSelectStatement(ollamaResponse);
         }
+
         if (sql != null && !sql.isEmpty()) {
             sql = sanitizeResponse(sql);
             //sql을 암호화해서 String lastQuery에 저장
-            String encSql = encrypt((lastQuery == null || lastQuery.isEmpty()) ? sql : lastQuery);
-            logger.debug("Encrypted SQL generated, length={}", (encSql != null ? encSql.length() : 0));
-            
+            String sqlOrg = sql;
             if(tableQuery != null && !tableQuery.isEmpty()) {
                 sql = sql.replace(tableName, tableQuery);
             }
 
             QueryResponse queryResponse = executeQuery(sql, detailYn, headerColumns);
-            queryResponse.setMessage(ollamaResponse);
-            queryResponse.setLastQuery(encSql);
+
+            if(lastQuery == null || lastQuery.isEmpty()) { // 처음 쿼리인 경우
+                lastQuery = sqlOrg;
+                lastColumns = queryResponse.getColumns();
+                lastDetailYn = queryResponse.getDetailYn();
+            }else { // 이후 쿼리인 경우
+                // queryResponse.getColumns() 에 lastColumns 가 포함되면 lastColumns 갱신
+                if (lastColumns != null && !lastColumns.isEmpty()) {
+                    if (queryResponse.getColumns().containsAll(lastColumns)) {
+                        lastColumns = queryResponse.getColumns();
+                        lastQuery = sqlOrg;
+                        lastDetailYn = queryResponse.getDetailYn();
+                    }
+                } else {
+                    lastColumns = queryResponse.getColumns();
+                }
+
+            }
+
+            queryResponse.setMessage("SUCCESS");
+            queryResponse.setLastQuery(encrypt(lastQuery));
             queryResponse.setTableQuery(encrypt(tableQuery));
             queryResponse.setTableName(tableName);
-            if(detailYn != null && !detailYn.isEmpty()) {
-                queryResponse.setDetailYn(detailYn);
-            }
+            queryResponse.setLastDetailYn(lastDetailYn);
+            queryResponse.setLastColumns(lastColumns);
 
             return queryResponse;
         }
 
         QueryResponse response = new QueryResponse();
-        response.setMessage(ollamaResponse);
+        response.setMessage("FAIL");
 
         return response;
     }

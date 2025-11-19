@@ -46,11 +46,12 @@ public class QueryController {
             QueryResponse response = queryService.executeChatQuery(
                 request.getConversationId(), 
                 request.getPrompt(), 
-                request.getDetailYn(), 
+                request.getLastDetailYn(), 
                 request.getLastQuery(), 
                 request.getTableQuery(), 
                 request.getTableName(), 
-                request.getHeaderColumns()
+                request.getHeaderColumns(),
+                request.getLastColumns()
             );
             return ResponseEntity.ok(response);
         } catch (Exception e) {
