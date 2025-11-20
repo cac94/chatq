@@ -6,13 +6,13 @@ public class LoginResponse {
     private String message;
     private String auth;
     private List<String> infos;
-    private String level;
+    private int level;
     private String user_nm;
 
     public LoginResponse() {
     }
 
-    public LoginResponse(String message, String auth, List<String> infos, String level, String user_nm) {
+    public LoginResponse(String message, String auth, List<String> infos, int level, String user_nm) {
         this.message = message;
         this.auth = auth;
         this.infos = infos;
@@ -44,11 +44,11 @@ public class LoginResponse {
         this.infos = infos;
     }
 
-    public String getLevel() {
+    public int getLevel() {
         return level;
     }
 
-    public void setLevel(String level) {
+    public void setLevel(int level) {
         this.level = level;
     }
 

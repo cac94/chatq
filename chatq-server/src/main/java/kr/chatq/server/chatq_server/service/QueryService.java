@@ -579,7 +579,7 @@ public class QueryService {
         if(users != null && !users.isEmpty()) {
             Map<String, Object> userInfo = users.get(0);
             String auth = (String) userInfo.get("auth");
-            String level = String.valueOf(userInfo.get("level"));
+            int level = ((Number) userInfo.get("level")).intValue();
             String userName = (String) userInfo.get("user_nm");
             List<Map<String, Object>> authTables = dbService.getAuthTables(auth);
             List<String> infos = new ArrayList<>();
@@ -594,7 +594,7 @@ public class QueryService {
             session.setAttribute("USER", user);
             session.setAttribute("USER_NM", userName);
             session.setAttribute("AUTH", auth);
-            session.setAttribute("LEVEL", Integer.parseInt(level));
+            session.setAttribute("LEVEL", level);
 
             return new LoginResponse(
                 "SUCCESS",
@@ -604,7 +604,7 @@ public class QueryService {
                 userName
             );
         }else {
-            return new LoginResponse("FAIL", null, null, null, null);
+            return new LoginResponse("FAIL", null, null, 9, null);
         }
     }
 

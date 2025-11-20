@@ -5,6 +5,9 @@ import DataGrid from './components/DataGrid'
 import Modal from './components/Modal'
 import LoginModal from './components/LoginModal'
 import UserInfoModal from './components/UserInfoModal'
+import UserManagement from './components/UserManagement'
+import AuthManagement from './components/AuthManagement'
+import InfoManagement from './components/InfoManagement'
 import chatqLogo from './assets/chatqicon51x51.png'
 
 const API_BASE_URL = 'http://localhost:8080'
@@ -18,6 +21,9 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showUserInfoModal, setShowUserInfoModal] = useState(false)
+  const [showUserManagement, setShowUserManagement] = useState(false)
+  const [showAuthManagement, setShowAuthManagement] = useState(false)
+  const [showInfoManagement, setShowInfoManagement] = useState(false)
   const [showAlert, setShowAlert] = useState(false)
   const [alertMessage, setAlertMessage] = useState('')
   const [auth, setAuth] = useState('GUEST')
@@ -140,14 +146,13 @@ const App = () => {
     <div className="min-h-screen w-full bg-slate-900">
       {/* Fixed header with input */}
       <div className="sticky top-0 bg-slate-900 p-4 shadow-lg z-50" ref={inputContainerRef}>
-        <div className="absolute top-4 right-4 flex items-center gap-2">
-          {level == '1' && (
+        <div className="absolute top-4 right-4 flex items-center gap-2 z-[60]">
+          {level === 1 && (
             <>
               <button
                 className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
                 onClick={() => {
-                  setAlertMessage('사용자 관리 기능 (준비중)')
-                  setShowAlert(true)
+                  setShowUserManagement(true)
                 }}
                 title="사용자 관리"
               >
@@ -158,8 +163,7 @@ const App = () => {
               <button
                 className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
                 onClick={() => {
-                  setAlertMessage('권한 관리 기능 (준비중)')
-                  setShowAlert(true)
+                  setShowAuthManagement(true)
                 }}
                 title="권한 관리"
               >
@@ -170,8 +174,7 @@ const App = () => {
               <button
                 className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
                 onClick={() => {
-                  setAlertMessage('정보 관리 기능 (준비중)')
-                  setShowAlert(true)
+                  setShowInfoManagement(true)
                 }}
                 title="정보 관리"
               >
@@ -393,6 +396,27 @@ const App = () => {
             setShowAlert(true)
           }
         }}
+      />
+
+      {/* User Management Modal */}
+      <UserManagement
+        isOpen={showUserManagement}
+        onClose={() => setShowUserManagement(false)}
+        apiBaseUrl={API_BASE_URL}
+      />
+
+      {/* Auth Management Modal */}
+      <AuthManagement
+        isOpen={showAuthManagement}
+        onClose={() => setShowAuthManagement(false)}
+        apiBaseUrl={API_BASE_URL}
+      />
+
+      {/* Info Management Modal */}
+      <InfoManagement
+        isOpen={showInfoManagement}
+        onClose={() => setShowInfoManagement(false)}
+        apiBaseUrl={API_BASE_URL}
       />
     </div>
   )
