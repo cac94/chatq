@@ -143,7 +143,8 @@ const DataGrid = ({ data, columns, headerData, headerColumns, detailYn }) => {
             onClick={() => handleRowClick(row, index)}
             className={`flex gap-4 p-4 bg-slate-800 
               ${index === displayData.length - 1 ? 'rounded-b-lg' : 'border-b border-slate-700'}
-              hover:bg-slate-700 cursor-pointer transition-colors`}
+              ${detailYn === 'Y' ? 'hover:bg-slate-700 cursor-pointer' : ''}
+              transition-colors`}
           >
             {displayColumns.map(col => {
               const value = row[col.key]

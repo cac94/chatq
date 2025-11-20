@@ -22,7 +22,7 @@ public class DbService {
 
     // chatqauth 테이블에서 auth 칼럼이 auth인 것을 조회
     public List<Map<String, Object>> getAuthTables(String auth) {
-        String sql = "SELECT * FROM chatqauth WHERE auth = ?";
+        String sql = "SELECT chatqauth.*,(SELECT max(table_alias) FROM chatqtable WHERE table_nm = chatqauth.table_nm) AS table_alias FROM chatqauth WHERE auth = ?";
         logger.info("Executing SQL: {} with params: [{}]", sql, auth);
         System.out.println("[DbService] Executing SQL: " + sql + " with params: [" + auth + "]");
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
@@ -61,11 +61,11 @@ public class DbService {
         }, auth, metaYn);
     }
 
-    // chatqauth 테이블에서 table_nm 칼럼이 tableNm인 것을 조회
-    public List<Map<String, Object>> getColumns(String tableNm) {
-        String sql = "SELECT * FROM chatqcolumn WHERE table_nm = ? order by column_order";
-        logger.info("Executing SQL: {} with params: [{}]", sql, tableNm);
-        System.out.println("[DbService] Executing SQL: " + sql + " with params: [" + tableNm + "]");
+    // chatqcolumn 테이블에서 table_nm 칼럼이 tableNm인 것을 조회
+    public List<Map<String, Object>> getColumns(String tableNm, int level) {
+        String sql = "SELECT * FROM chatqcolumn WHERE table_nm = ? and level >= ? order by column_order";
+        logger.info("Executing SQL: {} with params: [{}, {}]", sql, tableNm, level);
+        System.out.println("[DbService] Executing SQL: " + sql + " with params: [" + tableNm + ", " + level + "]");
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Map<String, Object> row = new HashMap<>();
             ResultSetMetaData metaData = rs.getMetaData();
@@ -76,6 +76,24 @@ public class DbService {
                 row.put(columnName, rs.getObject(columnName));
             }
             return row;
-        }, tableNm);
+        }, tableNm, level);
+    }
+
+    // chatquser 테이블에서 user, password 칼럼이 user, password인 것을 조회
+    public List<Map<String, Object>> getUsers(String user, String password) {
+        String sql = "SELECT * FROM chatquser WHERE user = ? and password = ?";
+        logger.info("Executing SQL: {} with params: [{}, {}]", sql, user, password);
+        System.out.println("[DbService] Executing SQL: " + sql + " with params: [" + user + ", " + password + "]");
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+            Map<String, Object> row = new HashMap<>();
+            ResultSetMetaData metaData = rs.getMetaData();
+            int columnCount = metaData.getColumnCount();
+            
+            for (int i = 1; i <= columnCount; i++) {
+                String columnName = metaData.getColumnLabel(i);
+                row.put(columnName, rs.getObject(columnName));
+            }
+            return row;
+        }, user, password);
     }
 }

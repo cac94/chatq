@@ -7,17 +7,17 @@ public class LoginResponse {
     private String auth;
     private List<String> infos;
     private String level;
-    private String user_name;
+    private String user_nm;
 
     public LoginResponse() {
     }
 
-    public LoginResponse(String message, String auth, List<String> infos, String level, String user_name) {
+    public LoginResponse(String message, String auth, List<String> infos, String level, String user_nm) {
         this.message = message;
         this.auth = auth;
         this.infos = infos;
         this.level = level;
-        this.user_name = user_name;
+        this.user_nm = user_nm;
     }
 
     public String getMessage() {
@@ -52,11 +52,11 @@ public class LoginResponse {
         this.level = level;
     }
 
-    public String getUser_name() {
-        return user_name;
+    public String getUser_nm() {
+        return user_nm;
     }
 
-    public void setUser_name(String user_name) {
-        this.user_name = user_name;
+    public void setUser_nm(String user_nm) {
+        this.user_nm = user_nm;
     }
 }

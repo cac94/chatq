@@ -23,7 +23,7 @@ public class PromptMakerService {
     }
 
     //쿼리문을 생성할 테이블 선택 프롬프트 생성
-    public Map<String, Object> getPickTablePrompt(String auth, String message) {
+    public Map<String, Object> getPickTablePrompt(String auth, String message, int level) throws SQLException {
         Map<String, Object> result = new java.util.HashMap<>();
         Map<String, String> infos = new java.util.HashMap<>();
 
@@ -45,7 +45,7 @@ public class PromptMakerService {
             promptBuilder.append("\"__").append(tableAlias).append("__\": \"select ");
             queryBuilder.append("select ");
 
-            List<Map<String, Object>> columns = dbService.getColumns(tableName);
+            List<Map<String, Object>> columns = dbService.getColumns(tableName, level);
             //문자열을 담을 배열 변수 columnList 선언
             List<String> columnList = new ArrayList<>();
             List<String> headerColumnList = new ArrayList<>();

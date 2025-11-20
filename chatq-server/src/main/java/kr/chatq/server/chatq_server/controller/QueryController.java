@@ -81,4 +81,14 @@ public class QueryController {
             return ResponseEntity.ok(response);
         }
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout() {
+        try {
+            queryService.processLogout();
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
 }

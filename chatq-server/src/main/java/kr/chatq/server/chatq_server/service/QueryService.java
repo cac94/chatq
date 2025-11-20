@@ -47,7 +47,7 @@ public class QueryService {
     private static final Logger logger = LoggerFactory.getLogger(PromptMakerService.class);
     private final OllamaChatModel chatModel;
     private final OpenAiChatModel openAiChatModel;
-
+ 
     // 대화 메모리를 저장할 Map (conversationId -> 메시지 리스트)
     private final Map<String, List<Message>> conversationMemory = new HashMap<>();
 
@@ -102,17 +102,17 @@ public class QueryService {
     private static final int GCM_TAG_LENGTH = 128; // bits
     private static final int IV_LENGTH = 12; // bytes
 
-    // Spring이 ChatModel (Ollama 또는 기본 ChatModel) 빈을 찾아서 주입
-    public QueryService(OllamaChatModel chatModel, OpenAiChatModel openAiChatModel) {
-        this.chatModel = chatModel;
-        this.openAiChatModel = openAiChatModel;
-    }
-
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
     private javax.sql.DataSource dataSource;
+
+    // Spring이 ChatModel (Ollama 또는 기본 ChatModel) 빈을 찾아서 주입
+    public QueryService(OllamaChatModel chatModel, OpenAiChatModel openAiChatModel) {
+        this.chatModel = chatModel;
+        this.openAiChatModel = openAiChatModel;
+    }
 
     public QueryResponse executeQuery(String sql, String detailYn, List<String> headerColumnList) {
         if (sql == null) {
@@ -204,7 +204,7 @@ public class QueryService {
             baseQuery = decrypt(lastQuery);
             lastQuery = baseQuery;
         }else{ // 이전 쿼리가 없으면 테이블 선택 프롬프트 실행
-            Map<String, Object> result = promptMakerService.getPickTablePrompt(getAuth(), message);
+            Map<String, Object> result = promptMakerService.getPickTablePrompt(getAuth(), message, getLevel());
             String prompt = (String) result.get("prompt");
             Map<String, String> infos = (Map<String, String>) result.get("infos");
 
@@ -496,6 +496,24 @@ public class QueryService {
         return "GUEST";
     }
 
+    // private 메소드: session에서 LEVEL 값이 있으면 가져오고 없으면 9 반환
+    private int getLevel() {
+        ServletRequestAttributes attr = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+        HttpSession session = attr.getRequest().getSession(false);
+        
+        if (session != null) {
+            Object level = session.getAttribute("LEVEL");
+            if (level != null) {
+                try {
+                    return Integer.parseInt(level.toString());
+                } catch (NumberFormatException e) {
+                    logger.warn("Invalid LEVEL format in session: {}", level);
+                }
+            }
+        }
+        return 9;
+    }
+
     // AES-GCM encryption (reversible)
     private String encrypt(String plainText) {
         if (plainText == null) return null;
@@ -556,27 +574,51 @@ public class QueryService {
      * @return LoginResponse
      */
     public LoginResponse processLogin(String user, String password) {
-        // TODO: 실제 구현시 DB에서 사용자 정보 조회 및 암호화된 비밀번호 검증 필요
-        
-        // 임시 하드코딩된 로그인 검증
-        if ("admin".equals(user) && "password".equals(password)) {
+        DbService dbService = new DbService(jdbcTemplate);
+        List<Map<String, Object>> users = dbService.getUsers(user, password);
+        if(users != null && !users.isEmpty()) {
+            Map<String, Object> userInfo = users.get(0);
+            String auth = (String) userInfo.get("auth");
+            String level = String.valueOf(userInfo.get("level"));
+            String userName = (String) userInfo.get("user_nm");
+            List<Map<String, Object>> authTables = dbService.getAuthTables(auth);
+            List<String> infos = new ArrayList<>();
+            for(Map<String, Object> table : authTables) {
+                String tableAlias = (String) table.get("table_alias");
+                infos.add(tableAlias);
+            }
+
+            // 세션에 사용자 정보 저장
+            ServletRequestAttributes attr = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+            HttpSession session = attr.getRequest().getSession(true);
+            session.setAttribute("USER", user);
+            session.setAttribute("USER_NM", userName);
+            session.setAttribute("AUTH", auth);
+            session.setAttribute("LEVEL", Integer.parseInt(level));
+
             return new LoginResponse(
                 "SUCCESS",
-                "ADMIN",
-                Arrays.asList("사용자관리", "데이터조회", "시스템설정"),
-                "1",
-                "관리자"
+                auth,
+                infos,
+                level,
+                userName
             );
-        } else if ("user".equals(user) && "user123".equals(password)) {
-            return new LoginResponse(
-                "SUCCESS",
-                "USER",
-                Arrays.asList("데이터조회"),
-                "2",
-                "일반사용자"
-            );
-        } else {
+        }else {
             return new LoginResponse("FAIL", null, null, null, null);
+        }
+    }
+
+    /**
+     * 로그아웃 처리
+     */
+    public void processLogout() {
+        ServletRequestAttributes attr = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+        HttpSession session = attr.getRequest().getSession(false);
+        if (session != null) {
+            session.removeAttribute("USER");
+            session.removeAttribute("USER_NM");
+            session.removeAttribute("AUTH");
+            session.removeAttribute("LEVEL");
         }
     }
 }
