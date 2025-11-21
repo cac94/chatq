@@ -40,13 +40,15 @@ const UserManagement = ({ isOpen, onClose, apiBaseUrl }) => {
 
   const loadAuthOptions = async () => {
     try {
-      // TODO: Replace with actual API endpoint
       const response = await axios.get(`${apiBaseUrl}/api/auth-options`)
       setAuthOptions(response.data)
     } catch (error) {
       console.error('Failed to load auth options:', error)
       // Mock data for development
-      setAuthOptions(['ADMIN', 'USER', 'GUEST', 'MANAGER'])
+      setAuthOptions([
+        { auth: 'ADMIN', auth_nm: '관리자' },
+        { auth: 'GUEST', auth_nm: '게스트' },
+      ])
     }
   }
 
@@ -256,8 +258,10 @@ const UserManagement = ({ isOpen, onClose, apiBaseUrl }) => {
                   className="w-full p-2 rounded bg-slate-600 text-white border border-slate-500 focus:outline-none focus:border-blue-500 text-sm"
                 >
                   <option value="">선택하세요</option>
-                  {authOptions.map((auth) => (
-                    <option key={auth} value={auth}>{auth}</option>
+                  {authOptions.map((option) => (
+                    <option key={option.auth} value={option.auth}>
+                      {option.auth_nm} ({option.auth})
+                    </option>
                   ))}
                 </select>
               </div>

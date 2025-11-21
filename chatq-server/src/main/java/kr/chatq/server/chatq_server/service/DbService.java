@@ -80,10 +80,10 @@ public class DbService {
     }
 
     // chatquser 테이블에서 user, password 칼럼이 user, password인 것을 조회
-    public List<Map<String, Object>> getUsers(String user, String password) {
-        String sql = "SELECT * FROM chatquser WHERE user = ? and password = ?";
-        logger.info("Executing SQL: {} with params: [{}, {}]", sql, user, password);
-        System.out.println("[DbService] Executing SQL: " + sql + " with params: [" + user + ", " + password + "]");
+    public List<Map<String, Object>> getUsers(String user) {
+        String sql = "SELECT * FROM chatquser WHERE user = ?";
+        logger.info("Executing SQL: {} with params: [{}]", sql, user);
+        System.out.println("[DbService] Executing SQL: " + sql + " with params: [" + user + "]");
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Map<String, Object> row = new HashMap<>();
             ResultSetMetaData metaData = rs.getMetaData();
@@ -94,6 +94,6 @@ public class DbService {
                 row.put(columnName, rs.getObject(columnName));
             }
             return row;
-        }, user, password);
+        }, user);
     }
 }

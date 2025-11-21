@@ -4,7 +4,7 @@ import axios from 'axios'
 
 const AuthManagement = ({ isOpen, onClose, apiBaseUrl }) => {
   const [auths, setAuths] = useState([])
-  const [authInfoOptions, setAuthInfoOptions] = useState([])
+  const [infoOptions, setInfoOptions] = useState([])
   const [editingAuth, setEditingAuth] = useState(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [formData, setFormData] = useState({
@@ -16,7 +16,7 @@ const AuthManagement = ({ isOpen, onClose, apiBaseUrl }) => {
   useEffect(() => {
     if (isOpen) {
       loadAuths()
-      loadAuthInfoOptions()
+      loadInfoOptions()
     }
   }, [isOpen])
 
@@ -29,26 +29,26 @@ const AuthManagement = ({ isOpen, onClose, apiBaseUrl }) => {
       console.error('Failed to load auths:', error)
       // Mock data for development
       setAuths([
-        { auth: 'ADMIN', auth_nm: '관리자', infos: '전체 권한' },
-        { auth: 'USER', auth_nm: '일반사용자', infos: '조회 권한' }
+        { auth: 'ADMIN', auth_nm: '관리자', infos: '전체 권한', infonms: '사용자,권한,테이블' },
+        { auth: 'USER', auth_nm: '일반사용자', infos: '조회 권한', infonms: '사용자' }
       ])
     }
   }
 
-  const loadAuthInfoOptions = async () => {
+  const loadInfoOptions = async () => {
     try {
       // TODO: Replace with actual API endpoint
-      const response = await axios.get(`${apiBaseUrl}/api/auth-infos`)
-      setAuthInfoOptions(response.data)
+      const response = await axios.get(`${apiBaseUrl}/api/infos`)
+      setInfoOptions(response.data)
     } catch (error) {
       console.error('Failed to load auth info options:', error)
       // Mock data for development
-      setAuthInfoOptions([
-        { code: 'READ', name: '조회' },
-        { code: 'WRITE', name: '작성' },
-        { code: 'UPDATE', name: '수정' },
-        { code: 'DELETE', name: '삭제' },
-        { code: 'ADMIN', name: '관리' }
+      setInfoOptions([
+        { table_nm: 'READ', table_alias: '조회' },
+        { table_nm: 'WRITE', table_alias: '작성' },
+        { table_nm: 'UPDATE', table_alias: '수정' },
+        { table_nm: 'DELETE', table_alias: '삭제' },
+        { table_nm: 'ADMIN', table_alias: '관리' }
       ])
     }
   }
@@ -143,7 +143,7 @@ const AuthManagement = ({ isOpen, onClose, apiBaseUrl }) => {
                   <tr key={auth.auth} className="border-t border-slate-700 hover:bg-slate-750">
                     <td className="px-4 py-2 text-slate-300 text-sm">{auth.auth}</td>
                     <td className="px-4 py-2 text-slate-300 text-sm">{auth.auth_nm}</td>
-                    <td className="px-4 py-2 text-slate-300 text-sm">{auth.infos}</td>
+                    <td className="px-4 py-2 text-slate-300 text-sm">{auth.infonms}</td>
                     <td className="px-4 py-2 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
@@ -202,27 +202,27 @@ const AuthManagement = ({ isOpen, onClose, apiBaseUrl }) => {
               <div className="col-span-2">
                 <label className="block text-slate-300 mb-2 text-sm">권한 정보</label>
                 <div className="grid grid-cols-2 gap-2 p-3 rounded bg-slate-600 border border-slate-500 max-h-[200px] overflow-y-auto">
-                  {authInfoOptions.map((option) => (
-                    <label key={option.code} className="flex items-center gap-2 text-slate-200 cursor-pointer hover:text-white text-sm">
+                  {infoOptions.map((option) => (
+                    <label key={option.table_nm} className="flex items-center gap-2 text-slate-200 cursor-pointer hover:text-white text-sm">
                       <input
                         type="checkbox"
-                        checked={formData.infos.includes(option.code)}
+                        checked={formData.infos.includes(option.table_nm)}
                         onChange={(e) => {
                           if (e.target.checked) {
                             setFormData({
                               ...formData,
-                              infos: [...formData.infos, option.code]
+                              infos: [...formData.infos, option.table_nm]
                             })
                           } else {
                             setFormData({
                               ...formData,
-                              infos: formData.infos.filter(d => d !== option.code)
+                              infos: formData.infos.filter(d => d !== option.table_nm)
                             })
                           }
                         }}
                         className="w-4 h-4 rounded bg-slate-700 border-slate-400"
                       />
-                      <span>{option.name}</span>
+                      <span>{option.table_alias}</span>
                     </label>
                   ))}
                 </div>

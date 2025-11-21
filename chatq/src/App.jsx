@@ -26,7 +26,9 @@ const App = () => {
   const [showInfoManagement, setShowInfoManagement] = useState(false)
   const [showAlert, setShowAlert] = useState(false)
   const [alertMessage, setAlertMessage] = useState('')
+  const [openUserInfoAfterAlert, setOpenUserInfoAfterAlert] = useState(false)
   const [auth, setAuth] = useState('GUEST')
+  const [user, setUser] = useState(null)
   const [infos, setInfos] = useState(null)
   const [level, setLevel] = useState(9)
   const [userNm, setUserNm] = useState(null)
@@ -66,9 +68,19 @@ const App = () => {
       setInfos(response.data.infos)
       setLevel(response.data.level)
       setUserNm(response.data.user_nm)
+      // 사용자 아이디 저장 (우선 서버 응답, 없으면 입력값 사용)
+      setUser(response.data.user || username)
       
       setShowLoginModal(false)
-      setAlertMessage(`${response.data.user_nm}님 환영합니다!`)
+      // 비밀번호 초기화 상태면 안내 메시지와 함께 사용자정보 모달 오픈
+      const pwdFiredYn = response.data.pwdFiredYn ?? response.data.pwd_fired_yn
+      if (pwdFiredYn === 'Y') {
+        setAlertMessage(`${response.data.user_nm}님 환영합니다! 비번을 수정해주세요.`)
+        setOpenUserInfoAfterAlert(true)
+      } else {
+        setAlertMessage(`${response.data.user_nm}님 환영합니다!`)
+        setOpenUserInfoAfterAlert(false)
+      }
       setShowAlert(true)
     } catch (error) {
       console.error('Login Error:', error)
@@ -141,6 +153,14 @@ const App = () => {
       bottomRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [grids])
+
+  // After alert is closed, open UserInfoModal if requested
+  useEffect(() => {
+    if (!showAlert && openUserInfoAfterAlert) {
+      setShowUserInfoModal(true)
+      setOpenUserInfoAfterAlert(false)
+    }
+  }, [showAlert, openUserInfoAfterAlert])
 
   return (
     <div className="min-h-screen w-full bg-slate-900">
@@ -242,7 +262,8 @@ const App = () => {
                 }
               }}
               placeholder="DB에서 조회하고 싶은 것을 물어보세요..."
-              className="w-full p-3 pl-12 pr-12 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 focus:outline-none focus:border-slate-500"
+              className="w-full p-3 pl-12 pr-12 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 focus:outline-none focus:border-slate-500 appearance-none !bg-slate-800 !text-slate-200 !border-slate-700"
+              autoComplete="off"
             />
             <button 
               onClick={handleSend}
@@ -369,14 +390,17 @@ const App = () => {
       <UserInfoModal
         isOpen={showUserInfoModal}
         onClose={() => setShowUserInfoModal(false)}
+        user={user}
         userName={userNm}
         auth={auth}
         level={level}
         infos={infos ? infos.join(', ') : ''}
+        apiBaseUrl={API_BASE_URL}
         onLogout={async () => {
           try {
             await axios.post(`${API_BASE_URL}/api/logout`)
             setAuth(null)
+            setUser(null)
             setInfos(null)
             setLevel(null)
             setUserNm(null)

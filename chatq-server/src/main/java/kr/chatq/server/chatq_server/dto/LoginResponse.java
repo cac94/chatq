@@ -8,16 +8,18 @@ public class LoginResponse {
     private List<String> infos;
     private int level;
     private String user_nm;
+    private String pwdFiredYn;
 
     public LoginResponse() {
     }
 
-    public LoginResponse(String message, String auth, List<String> infos, int level, String user_nm) {
+    public LoginResponse(String message, String auth, List<String> infos, int level, String user_nm, String pwdFiredYn) {
         this.message = message;
         this.auth = auth;
         this.infos = infos;
         this.level = level;
         this.user_nm = user_nm;
+        this.pwdFiredYn = pwdFiredYn;
     }
 
     public String getMessage() {
@@ -58,5 +60,13 @@ public class LoginResponse {
 
     public void setUser_nm(String user_nm) {
         this.user_nm = user_nm;
+    }
+
+    public String getPwdFiredYn() {
+        return pwdFiredYn;
+    }
+
+    public void setPwdFiredYn(String pwdFiredYn) {
+        this.pwdFiredYn = pwdFiredYn;
     }
 }

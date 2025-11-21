@@ -2,6 +2,7 @@ package kr.chatq.server.chatq_server.service;
 
 import kr.chatq.server.chatq_server.dto.LoginResponse;
 import kr.chatq.server.chatq_server.dto.QueryResponse;
+import kr.chatq.server.chatq_server.dto.UserDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,6 +13,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.ollama.api.OllamaOptions;
@@ -25,6 +27,8 @@ import jakarta.servlet.http.HttpSession;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -40,6 +44,7 @@ import java.util.regex.Pattern;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 @Service
 public class QueryService {
@@ -101,6 +106,9 @@ public class QueryService {
 
     private static final int GCM_TAG_LENGTH = 128; // bits
     private static final int IV_LENGTH = 12; // bytes
+
+    // BCrypt encoder (one-way hashing, salt included per hash)
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -378,7 +386,9 @@ public class QueryService {
     }
     
     // private 메소드: Ollama에 문자열 보내고 결과 받기
+    @SuppressWarnings("null")
     private String sendChatToOllama(String message) {
+        ChatResponse response;
         OllamaOptions options = OllamaOptions.builder()
             .model(aimodel)
             .temperature(temperature)
@@ -388,7 +398,29 @@ public class QueryService {
             .topP(topP)
             .build();
 
-        ChatResponse response = chatModel.call(new Prompt(message, options));
+        if("gpt-oss:20b".equals(aimodel)) {
+            response = chatModel.call(
+                new Prompt(
+                    List.of(
+                        // new SystemMessage("""
+                        //     Use reasoning effort = "high".
+                        //     Perform multi-step chain-of-thought internally.
+                        // """),
+                        new SystemMessage("""
+                            {
+                                "settings": {
+                                    "reasoning_effort": "low"
+                                }
+                            }
+                        """),
+                        new UserMessage(message)
+                    )
+                )
+            );
+        }else {
+            response = chatModel.call(new Prompt(message, options));
+        }
+
         String rawText = response.getResult().getOutput().getText();
         
         return sanitizeResponse(rawText);
@@ -496,6 +528,20 @@ public class QueryService {
         return "GUEST";
     }
 
+    // private 메소드: session에서 USER 값이 있으면 가져오고 없으면 GUEST 반환
+    private String getUser() {
+        ServletRequestAttributes attr = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+        HttpSession session = attr.getRequest().getSession(false);
+        
+        if (session != null) {
+            Object user = session.getAttribute("USER");
+            if (user != null) {
+                return user.toString();
+            }
+        }
+        return "guest";
+    }
+
     // private 메소드: session에서 LEVEL 값이 있으면 가져오고 없으면 9 반환
     private int getLevel() {
         ServletRequestAttributes attr = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
@@ -575,37 +621,48 @@ public class QueryService {
      */
     public LoginResponse processLogin(String user, String password) {
         DbService dbService = new DbService(jdbcTemplate);
-        List<Map<String, Object>> users = dbService.getUsers(user, password);
-        if(users != null && !users.isEmpty()) {
-            Map<String, Object> userInfo = users.get(0);
-            String auth = (String) userInfo.get("auth");
-            int level = ((Number) userInfo.get("level")).intValue();
-            String userName = (String) userInfo.get("user_nm");
-            List<Map<String, Object>> authTables = dbService.getAuthTables(auth);
-            List<String> infos = new ArrayList<>();
-            for(Map<String, Object> table : authTables) {
-                String tableAlias = (String) table.get("table_alias");
-                infos.add(tableAlias);
-            }
-
-            // 세션에 사용자 정보 저장
-            ServletRequestAttributes attr = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
-            HttpSession session = attr.getRequest().getSession(true);
-            session.setAttribute("USER", user);
-            session.setAttribute("USER_NM", userName);
-            session.setAttribute("AUTH", auth);
-            session.setAttribute("LEVEL", level);
-
-            return new LoginResponse(
-                "SUCCESS",
-                auth,
-                infos,
-                level,
-                userName
-            );
-        }else {
-            return new LoginResponse("FAIL", null, null, 9, null);
+        // 1) 사용자 기본 정보 + 암호화된 비밀번호 조회
+        List<Map<String, Object>> rows = dbService.getUsers(user);
+        if (rows.isEmpty()) {
+            return new LoginResponse("FAIL", null, null, 9, null, null);
         }
+
+        Map<String, Object> userInfo = rows.get(0);
+        String hashedPassword = (String) userInfo.get("password");
+        if (hashedPassword == null || !matchesPwd(password, hashedPassword)) {
+            // 비밀번호 불일치
+            return new LoginResponse("FAIL", null, null, 9, null, null);
+        }
+
+        String auth = (String) userInfo.get("auth");
+        int level = ((Number) userInfo.get("level")).intValue();
+        String userName = (String) userInfo.get("user_nm");
+        String pwdFiredYn = (String) userInfo.get("pwd_fired_yn");
+
+        // 2) 권한별 접근 가능한 정보(테이블) 목록 조회
+        List<Map<String, Object>> authTables = dbService.getAuthTables(auth);
+        List<String> infos = new ArrayList<>();
+        for (Map<String, Object> table : authTables) {
+            String tableAlias = (String) table.get("table_alias");
+            infos.add(tableAlias);
+        }
+
+        // 3) 세션 저장
+        ServletRequestAttributes attr = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+        HttpSession session = attr.getRequest().getSession(true);
+        session.setAttribute("USER", user);
+        session.setAttribute("USER_NM", userName);
+        session.setAttribute("AUTH", auth);
+        session.setAttribute("LEVEL", level);
+
+        return new LoginResponse(
+            "SUCCESS",
+            auth,
+            infos,
+            level,
+            userName,
+            pwdFiredYn
+        );
     }
 
     /**
@@ -620,5 +677,245 @@ public class QueryService {
             session.removeAttribute("AUTH");
             session.removeAttribute("LEVEL");
         }
+    }
+
+    /**
+     * 모든 사용자 조회
+     */
+    public List<UserDto> getUsers() {
+        String sql = "SELECT user, user_nm, auth, level FROM chatquser ORDER BY user";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+            UserDto user = new UserDto();
+            user.setUser(rs.getString("user"));
+            user.setUser_nm(rs.getString("user_nm"));
+            user.setAuth(rs.getString("auth"));
+            user.setLevel(rs.getInt("level"));
+            return user;
+        });
+    }
+
+    /**
+     * 사용자 생성
+     */
+    public void createUser(UserDto user) {
+        String encryptedPassword = encryptPwd(user.getPassword());
+        String sql = "INSERT INTO chatquser (user, user_nm, password, auth, level) VALUES (?, ?, ?, ?, ?)";
+        jdbcTemplate.update(sql, 
+            user.getUser(), 
+            user.getUser_nm(), 
+            encryptedPassword, 
+            user.getAuth(), 
+            user.getLevel()
+        );
+    }
+
+    /**
+     * 사용자 수정
+     */
+    public void updateUser(String userId, UserDto user) {
+        if (user.getPassword() != null && !user.getPassword().isEmpty()) {
+            String encryptedPassword = encryptPwd(user.getPassword());
+            String sql = "UPDATE chatquser SET user_nm = ?, password = ?, auth = ?, level = ? WHERE user = ?";
+            jdbcTemplate.update(sql, 
+                user.getUser_nm(), 
+                encryptedPassword, 
+                user.getAuth(), 
+                user.getLevel(), 
+                userId
+            );
+        } else {
+            String sql = "UPDATE chatquser SET user_nm = ?, auth = ?, level = ? WHERE user = ?";
+            jdbcTemplate.update(sql, 
+                user.getUser_nm(), 
+                user.getAuth(), 
+                user.getLevel(), 
+                userId
+            );
+        }
+    }
+
+    /**
+     * 사용자 삭제
+     */
+    public void deleteUser(String userId) {
+        String sql = "DELETE FROM chatquser WHERE user = ?";
+        jdbcTemplate.update(sql, userId);
+    }
+
+    /**
+     * 비밀번호 초기화 (기본값으로 설정)
+     */
+    public void resetPassword(String userId) {
+        String defaultPassword = userId; // 기본 비밀번호
+        String encryptedPassword = encryptPwd(defaultPassword);
+        String sql = "UPDATE chatquser SET pwd_fired_yn = 'Y', password = ? WHERE user = ?";
+        jdbcTemplate.update(sql, encryptedPassword, userId);
+    }
+
+    /**
+     * 비밀번호 변경
+     * @param userId 사용자 아이디
+     * @param currentPassword 현재 비밀번호 (null 이면 검증 없이 변경)
+     * @param newPassword 새 비밀번호
+     */
+    public void changePassword(String userId, String currentPassword, String newPassword) {
+        if (userId == null || userId.isEmpty()) {
+            throw new IllegalArgumentException("userId cannot be null or empty");
+        }
+        if (newPassword == null || newPassword.isEmpty()) {
+            throw new IllegalArgumentException("newPassword cannot be null or empty");
+        }
+
+        DbService dbService = new DbService(jdbcTemplate);
+        List<Map<String, Object>> rows = dbService.getUsers(userId);
+        if (rows.isEmpty()) {
+            throw new IllegalArgumentException("User not found: " + userId);
+        }
+
+        Map<String, Object> userInfo = rows.get(0);
+        String hashedPassword = (String) userInfo.get("password");
+
+        // currentPassword 가 주어지면 검증
+        if (currentPassword != null && !currentPassword.isEmpty()) {
+            if (hashedPassword == null || !matchesPwd(currentPassword, hashedPassword)) {
+                throw new IllegalArgumentException("Current password does not match");
+            }
+        }
+
+        String newHashed = encryptPwd(newPassword);
+        String sql = "UPDATE chatquser SET pwd_fired_yn = 'N', password = ? WHERE user = ?";
+        jdbcTemplate.update(sql, newHashed, userId);
+    }
+    /**
+     * One-way password hashing using BCrypt. Each invocation generates a unique salt.
+     */
+    public String encryptPwd(String rawPassword) {
+        if (rawPassword == null) {
+            throw new IllegalArgumentException("rawPassword cannot be null");
+        }
+        return passwordEncoder.encode(rawPassword);
+    }
+
+    /**
+     * Verify raw password against stored BCrypt hash.
+     */
+    public boolean matchesPwd(String rawPassword, String hashedPassword) {
+        if (rawPassword == null || hashedPassword == null) {
+            return false;
+        }
+        return passwordEncoder.matches(rawPassword, hashedPassword);
+    }
+
+    /**
+     * 모든 권한 옵션 조회
+     * @return 권한 목록
+     */
+    public List<Map<String, String>> getAuthOptions() {
+        String sql = "SELECT code as auth, text1 as auth_nm FROM chatqcode WHERE codetype = 'AUTH' ORDER BY sortorder";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+            Map<String, String> map = new HashMap<>();
+            map.put("auth", rs.getString("auth"));
+            map.put("auth_nm", rs.getString("auth_nm"));
+            return map;
+        });
+    }
+
+    /**
+     * 권한 목록 조회 (상세)
+     * @return 권한 목록
+     */
+    public List<kr.chatq.server.chatq_server.dto.AuthDto> getAuths() {
+        String sql = "SELECT code as auth, text1 as auth_nm, " +
+                     "(SELECT GROUP_CONCAT(table_nm) \r\n" + //
+                        "FROM chatqauth\r\n" + //
+                        "WHERE auth = chatqcode.code) as infos, " +
+                     "(SELECT GROUP_CONCAT(tb.table_alias) \r\n" + //
+                        "FROM chatqauth au\r\n" + //
+                        "INNER JOIN chatqtable tb\r\n" + //
+                        "ON(au.table_nm = tb.table_nm)\r\n" + //
+                        "WHERE au.auth = chatqcode.code) as infonms " +
+                     "FROM chatqcode WHERE codetype = 'AUTH' ORDER BY sortorder";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+            kr.chatq.server.chatq_server.dto.AuthDto auth = new kr.chatq.server.chatq_server.dto.AuthDto();
+            auth.setAuth(rs.getString("auth"));
+            auth.setAuth_nm(rs.getString("auth_nm"));
+            auth.setInfos(rs.getString("infos"));
+            auth.setInfonms(rs.getString("infonms"));
+            return auth;
+        });
+    }
+
+    /**
+     * 권한 생성
+     * @param auth 권한 정보
+     */
+    public void createAuth(kr.chatq.server.chatq_server.dto.AuthDto auth) {
+        // 1. chatqcode 테이블에 권한 추가
+        String codeSql = "INSERT INTO chatqcode (codetype, code, text1) VALUES ('AUTH', ?, ?)";
+        jdbcTemplate.update(codeSql, auth.getAuth(), auth.getAuth_nm());
+
+        // 2. infos가 있으면 chatqauth 테이블에 추가
+        if (auth.getInfos() != null && !auth.getInfos().isEmpty()) {
+            String[] infoArray = auth.getInfos().split(",");
+            String authSql = "INSERT INTO chatqauth (auth, table_nm) VALUES (?, ?)";
+            for (String info : infoArray) {
+                jdbcTemplate.update(authSql, auth.getAuth(), info.trim());
+            }
+        }
+    }
+
+    /**
+     * 권한 수정
+     * @param authId 권한 코드
+     * @param auth 권한 정보
+     */
+    public void updateAuth(String authId, kr.chatq.server.chatq_server.dto.AuthDto auth) {
+        // 1. chatqcode 테이블 업데이트
+        String codeSql = "UPDATE chatqcode SET text1 = ? WHERE code = ?";
+        jdbcTemplate.update(codeSql, auth.getAuth_nm(), authId);
+
+        // 2. chatqauth 테이블 기존 데이터 삭제 후 재생성
+        String deleteSql = "DELETE FROM chatqauth WHERE auth = ?";
+        jdbcTemplate.update(deleteSql, authId);
+
+        if (auth.getInfos() != null && !auth.getInfos().isEmpty()) {
+            String[] infoArray = auth.getInfos().split(",");
+            String authSql = "INSERT INTO chatqauth (auth, table_nm, add_date, add_time, add_user) VALUES (?, ?, ?, ?, ?)";
+            String currentUser = getUser();
+            LocalDateTime now = LocalDateTime.now();
+            String addDate = now.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            String addTime = now.format(DateTimeFormatter.ofPattern("HHmmss"));
+            for (String info : infoArray) {
+                jdbcTemplate.update(authSql, authId, info.trim(), addDate, addTime, currentUser);
+            }
+        }
+    }
+
+    /**
+     * 권한 삭제
+     * @param authId 권한 코드
+     */
+    public void deleteAuth(String authId) {
+        // 1. chatqauth 테이블에서 삭제
+        String authSql = "DELETE FROM chatqauth WHERE auth = ?";
+        jdbcTemplate.update(authSql, authId);
+
+        // 2. chatqcode 테이블에서 삭제
+        String codeSql = "DELETE FROM chatqcode WHERE code = ?";
+        jdbcTemplate.update(codeSql, authId);
+    }
+
+    /**
+     * 정보(테이블) 목록 조회
+     * @return 정보 목록
+     */
+    public List<Map<String, String>> getInfos() {
+        String sql = "SELECT table_nm, table_alias FROM chatqtable ORDER BY table_nm";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+            Map<String, String> map = new HashMap<>();
+            map.put("table_nm", rs.getString("table_nm"));
+            map.put("table_alias", rs.getString("table_alias"));
+            return map;
+        });
     }
 }
