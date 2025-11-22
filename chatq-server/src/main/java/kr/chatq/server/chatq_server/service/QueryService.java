@@ -918,4 +918,40 @@ public class QueryService {
             return map;
         });
     }
+
+    /**
+     * 테이블의 칼럼 목록 조회 (메타데이터 기반)
+     * @param tableNm 테이블명
+     * @return 칼럼 목록 (column_cd, column_nm, level)
+     */
+    public List<kr.chatq.server.chatq_server.dto.ColumnDto> getInfoColumns(String tableNm) {
+        if (tableNm == null || tableNm.isEmpty()) {
+            return List.of();
+        }
+        String sql = "SELECT column_cd, column_nm, level FROM chatqcolumn WHERE table_nm = ? ORDER BY column_order";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+            kr.chatq.server.chatq_server.dto.ColumnDto dto = new kr.chatq.server.chatq_server.dto.ColumnDto();
+            dto.setColumn_cd(rs.getString("column_cd"));
+            dto.setColumn_nm(rs.getString("column_nm"));
+            dto.setLevel(rs.getInt("level"));
+            return dto;
+        }, tableNm);
+    }
+
+    /**
+     * 테이블 칼럼 정보 수정 (현재 메타 저장소가 없어 NO-OP 로깅 처리)
+     * @param tableNm 테이블명
+     * @param columns 수정할 칼럼 목록
+     */
+    public void updateInfoColumns(String tableNm, kr.chatq.server.chatq_server.dto.ColumnDto columnDto) {
+        if (tableNm == null || tableNm.isEmpty() || columnDto == null || columnDto.getColumn_cd() == null || columnDto.getColumn_cd().isEmpty()) {
+            return;
+        }
+        String sql = "UPDATE chatqcolumn SET level = ? WHERE table_nm = ? AND column_cd = ?";
+        jdbcTemplate.update(sql,
+            columnDto.getLevel(),
+            tableNm,
+            columnDto.getColumn_cd()
+        );
+    }
 }

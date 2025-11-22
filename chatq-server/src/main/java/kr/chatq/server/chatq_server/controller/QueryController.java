@@ -8,6 +8,7 @@ import kr.chatq.server.chatq_server.dto.UserDto;
 import kr.chatq.server.chatq_server.dto.PasswordChangeRequest;
 import kr.chatq.server.chatq_server.dto.AuthDto;
 import kr.chatq.server.chatq_server.service.QueryService;
+import kr.chatq.server.chatq_server.dto.ColumnDto;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -221,6 +222,26 @@ public class QueryController {
         try {
             List<Map<String, String>> infos = queryService.getInfos();
             return ResponseEntity.ok(infos);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/infos/columns/{tableNm}")
+    public ResponseEntity<List<ColumnDto>> getInfoColumns(@PathVariable String tableNm) {
+        try {
+            List<ColumnDto> columns = queryService.getInfoColumns(tableNm);
+            return ResponseEntity.ok(columns);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/infos/columns/{tableNm}")
+    public ResponseEntity<Void> updateInfoColumns(@PathVariable String tableNm, @RequestBody ColumnDto column) {
+        try {
+            queryService.updateInfoColumns(tableNm, column);
+            return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }
