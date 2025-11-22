@@ -7,19 +7,28 @@ public class LoginResponse {
     private String auth;
     private List<String> infos;
     private int level;
-    private String user_nm;
+    private String user;      // 사용자 아이디
+    private String user_nm;   // 사용자 이름
     private String pwdFiredYn;
 
     public LoginResponse() {
     }
 
-    public LoginResponse(String message, String auth, List<String> infos, int level, String user_nm, String pwdFiredYn) {
+    public LoginResponse(String message, String auth, List<String> infos, int level, String user, String user_nm, String pwdFiredYn) {
         this.message = message;
         this.auth = auth;
         this.infos = infos;
         this.level = level;
+        this.user = user;
         this.user_nm = user_nm;
         this.pwdFiredYn = pwdFiredYn;
+    }
+    public String getUser() {
+        return user;
+    }
+
+    public void setUser(String user) {
+        this.user = user;
     }
 
     public String getMessage() {

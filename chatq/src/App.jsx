@@ -43,6 +43,9 @@ const App = () => {
   const [tableName, setTableName] = useState(null)
   const [headerColumns, setHeaderColumns] = useState(null)
   const [lastColumns, setLastColumns] = useState(null)
+  // ChatQ session history: each session stores its first query
+  const [sessions, setSessions] = useState([]) // { id, firstQuery, startedAt }
+  const [currentSessionId, setCurrentSessionId] = useState(null)
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -89,12 +92,13 @@ const App = () => {
     }
   }
 
-  const handleSend = async () => {
-    if (query.trim()) {
+  const handleSend = async (overridePrompt = null, sessionIdForFirstQuery = null) => {
+    const effectivePrompt = overridePrompt !== null ? overridePrompt : query
+    if (effectivePrompt.trim()) {
       setIsLoading(true)
       try {
         const postData = {
-          prompt: query
+          prompt: effectivePrompt
         }
         if (lastQuery) postData.lastQuery = lastQuery
         if (tableQuery) postData.tableQuery = tableQuery
@@ -105,21 +109,20 @@ const App = () => {
 
         const response = await axios.post(qurl, postData)
 
-        // Convert the response format to match our grid structure
         const columns = response.data.columns.map(col => ({
           key: col,
-          label: col.charAt(0).toUpperCase() + col.slice(1) // Capitalize first letter
+          label: col.charAt(0).toUpperCase() + col.slice(1)
         }))
         const headerColumnsData = response.data.headerColumns 
           ? response.data.headerColumns.map(col => ({
               key: col,
-              label: col.charAt(0).toUpperCase() + col.slice(1) // Capitalize first letter
+              label: col.charAt(0).toUpperCase() + col.slice(1)
             }))
           : []
 
         setGrids(prevGrids => [...prevGrids, {
           id: Date.now(),
-          query: query,
+          query: effectivePrompt,
           data: response.data.data,
           columns: columns,
           headerColumns: headerColumnsData,
@@ -127,7 +130,15 @@ const App = () => {
           detailYn: response.data.detailYn
         }])
 
-        // Save lastQuery and tableQuery for next request
+        // Set firstQuery for session if absent (supports replay where session id provided directly)
+        const targetSessionId = sessionIdForFirstQuery || currentSessionId
+        setSessions(prev => prev.map(s => {
+          if (s.id === targetSessionId && !s.firstQuery) {
+            return { ...s, firstQuery: effectivePrompt }
+          }
+          return s
+        }))
+
         setLastQuery(response.data.lastQuery || null)
         setTableQuery(response.data.tableQuery || null)
         setLastDetailYn(response.data.lastDetailYn || null)
@@ -137,7 +148,8 @@ const App = () => {
         }
         setLastColumns(response.data.lastColumns || null)
 
-        setQuery('') // Clear input after sending
+        // Clear input only if not a replay (avoid flashing same text before send)
+        setQuery('')
       } catch (error) {
         console.error('API Error:', error)
         setAlertMessage('조회를 실패했습니다. 좀 더 구체적으로 입력해보시거나 상단의 ChatQ 로고를 클릭하여 새로 시작해보세요.')
@@ -148,11 +160,60 @@ const App = () => {
     }
   }
 
+  // Replay a previous session's first query by starting a new session and auto-running it
+  const handleReplay = (firstQuery) => {
+    if (!firstQuery) return
+    // Reset conversation state
+    setGrids([])
+    setLastQuery(null)
+    setTableQuery(null)
+    setLastDetailYn(null)
+    setTableName(null)
+    setHeaderColumns(null)
+    setLastColumns(null)
+    // Set the query input to show the replayed query
+    setQuery(firstQuery)
+    // Prepare new session id and immediately dispatch send using that id
+    const newId = Date.now()
+    setSessions(prev => [...prev, { id: newId, firstQuery: null, startedAt: new Date() }])
+    setCurrentSessionId(newId)
+    handleSend(firstQuery, newId)
+  }
+
   useEffect(() => {
     if (bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [grids])
+
+  // Check session on mount (restore user state after refresh)
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/check-session`)
+        if (response.data && response.data.user) {
+          // Restore user state from session
+          setAuth(response.data.auth || 'GUEST')
+          setInfos(response.data.infos || null)
+          setLevel(response.data.level || 9)
+          setUserNm(response.data.user_nm || null)
+          setUser(response.data.user)
+        }
+      } catch (error) {
+        console.log('No active session')
+      }
+    }
+    checkSession()
+  }, [])
+
+  // Initialize first session on mount if absent
+  useEffect(() => {
+    if (sessions.length === 0) {
+      const newId = Date.now()
+      setSessions([{ id: newId, firstQuery: null, startedAt: new Date() }])
+      setCurrentSessionId(newId)
+    }
+  }, [])
 
   // After alert is closed, open UserInfoModal if requested
   useEffect(() => {
@@ -166,6 +227,7 @@ const App = () => {
     <div className="min-h-screen w-full bg-slate-900">
       {/* Fixed header with input */}
       <div className="sticky top-0 bg-slate-900 p-4 shadow-lg z-50" ref={inputContainerRef}>
+        {/* Header actions (float right) */}
         <div className="absolute top-4 right-4 flex items-center gap-2 z-[60]">
           {level === 1 && (
             <>
@@ -220,7 +282,10 @@ const App = () => {
             </svg>
           </button>
         </div>
-        <div className="max-w-4xl mx-auto">
+        {/* Align header content with main content (reserve sidebar width) */}
+        <div className="flex">
+          <div className="hidden md:block w-64" />
+          <div className="flex-1 pr-2">
           <h1
             className="text-4xl font-bold text-white mb-6 text-center flex items-center justify-center gap-3 cursor-pointer select-none hover:opacity-90"
             role="button"
@@ -230,20 +295,27 @@ const App = () => {
               setGrids([])
               setLastQuery(null)
               setTableQuery(null)
-              setDetailYn(null)
+              setLastDetailYn(null)
               setTableName(null)
               setHeaderColumns(null)
               setLastColumns(null)
+              // Start a new ChatQ session
+              const newId = Date.now()
+              setSessions(prev => [...prev, { id: newId, firstQuery: null, startedAt: new Date() }])
+              setCurrentSessionId(newId)
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 setGrids([])
                 setLastQuery(null)
                 setTableQuery(null)
-                setDetailYn(null)
+                setLastDetailYn(null)
                 setTableName(null)
                 setHeaderColumns(null)
                 setLastColumns(null)
+                const newId = Date.now()
+                setSessions(prev => [...prev, { id: newId, firstQuery: null, startedAt: new Date() }])
+                setCurrentSessionId(newId)
               }
             }}
           >
@@ -286,12 +358,48 @@ const App = () => {
               )}
             </button>
           </div>
+          </div>
         </div>
       </div>
 
-      {/* Scrollable content area */}
-      <div className="max-w-4xl mx-auto p-4">
-        <div className="space-y-6 mt-4">
+      {/* Layout with left sidebar for first query history */}
+      <div className="flex">
+        {/* Sidebar */}
+        {/* Sticky sidebar so history stays visible while scrolling */}
+        <aside className="hidden md:block w-64 p-4 border-r border-slate-800 bg-slate-900/80 sticky top-24 h-[calc(100vh-6rem)] overflow-y-auto" style={{ paddingTop: '50px' }}>
+          <h2 className="text-slate-400 text-sm font-semibold mb-3">내 ChatQ 주제</h2>
+          <ul className="space-y-2 pr-1">
+            {sessions.filter(s => s.firstQuery).length === 0 && (
+              <li className="text-slate-500 text-xs">아직 첫 쿼리가 없습니다.</li>
+            )}
+            {sessions
+              .filter(s => s.firstQuery)
+              .sort((a,b) => new Date(b.startedAt) - new Date(a.startedAt))
+              .map(s => (
+              <li key={s.id} className="group relative">
+                <button
+                  type="button"
+                  onClick={() => handleReplay(s.firstQuery)}
+                  className="w-full text-left text-xs text-slate-300 hover:bg-slate-800/60 rounded px-1 py-1"
+                  title={`다시 실행: ${s.firstQuery}`}
+                >
+                  <span
+                    className="block w-full px-2 py-1 rounded bg-slate-800/70 group-hover:bg-slate-700/70 transition-colors overflow-hidden whitespace-nowrap text-ellipsis"
+                  >
+                    {s.firstQuery}
+                  </span>
+                </button>
+                {/* Hover full content tooltip */}
+                <div className="pointer-events-none absolute left-0 top-full mt-1 z-10 hidden group-hover:block bg-slate-800 text-slate-200 text-xs p-2 rounded shadow-lg max-w-xs whitespace-pre-wrap break-words">
+                  {s.firstQuery}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </aside>
+        {/* Main content */}
+        <div className="flex-1 p-4">
+          <div className="space-y-6 mt-4">
           {grids.map(grid => (
             <div key={grid.id} className="bg-slate-800 p-4 rounded-lg">
               <div className="text-slate-300 mb-4 font-medium flex items-center justify-between">
@@ -349,6 +457,8 @@ const App = () => {
           ))}
           <div ref={bottomRef} />
         </div>
+      </div>
+      {/* Close flex layout */}
       </div>
 
       {/* Login Modal */}

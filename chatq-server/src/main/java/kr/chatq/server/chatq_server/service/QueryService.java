@@ -624,14 +624,14 @@ public class QueryService {
         // 1) 사용자 기본 정보 + 암호화된 비밀번호 조회
         List<Map<String, Object>> rows = dbService.getUsers(user);
         if (rows.isEmpty()) {
-            return new LoginResponse("FAIL", null, null, 9, null, null);
+            return new LoginResponse("FAIL", null, null, 9, null, null, null);
         }
 
         Map<String, Object> userInfo = rows.get(0);
         String hashedPassword = (String) userInfo.get("password");
         if (hashedPassword == null || !matchesPwd(password, hashedPassword)) {
             // 비밀번호 불일치
-            return new LoginResponse("FAIL", null, null, 9, null, null);
+            return new LoginResponse("FAIL", null, null, 9, null, null, null);
         }
 
         String auth = (String) userInfo.get("auth");
@@ -654,12 +654,14 @@ public class QueryService {
         session.setAttribute("USER_NM", userName);
         session.setAttribute("AUTH", auth);
         session.setAttribute("LEVEL", level);
+        session.setAttribute("INFOS", infos);
 
         return new LoginResponse(
             "SUCCESS",
             auth,
             infos,
             level,
+            user,
             userName,
             pwdFiredYn
         );
@@ -953,5 +955,25 @@ public class QueryService {
             tableNm,
             columnDto.getColumn_cd()
         );
+    }
+
+    /**
+     * 현재 HTTP 세션에서 로그인 정보를 복원한다.
+     * 컨트롤러 /api/check-session 엔드포인트에서 사용.
+     * @param session HttpSession
+     * @return LoginResponse (SUCCESS 또는 FAIL)
+     */
+    public LoginResponse checkSession(HttpSession session) {
+        if (session == null) {
+            return new LoginResponse("FAIL", null, null, 9, null, null, null);
+        }
+        String user = (String) session.getAttribute("USER");
+        String auth = (String) session.getAttribute("AUTH");
+        @SuppressWarnings("unchecked")
+        List<String> infos = (List<String>) session.getAttribute("INFOS");
+        Integer level = (Integer) session.getAttribute("LEVEL");
+        String userName = (String) session.getAttribute("USER_NM");
+        if (level == null) level = 9;
+        return new LoginResponse("SUCCESS", auth, infos, level, user, userName, null);
     }
 }

@@ -88,7 +88,7 @@ public class QueryController {
             LoginResponse response = queryService.processLogin(request.getUser(), request.getPassword());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            LoginResponse response = new LoginResponse("FAIL", null, null, 9, null, null);
+            LoginResponse response = new LoginResponse("FAIL", null, null, 9, null, null, null);
             return ResponseEntity.ok(response);
         }
     }
@@ -101,6 +101,12 @@ public class QueryController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    @GetMapping("/check-session")
+    public ResponseEntity<LoginResponse> checkSession(HttpSession session) {
+        LoginResponse response = queryService.checkSession(session);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/users")
