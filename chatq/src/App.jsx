@@ -47,6 +47,21 @@ const App = () => {
   const [sessions, setSessions] = useState([]) // { id, firstQuery, startedAt }
   const [currentSessionId, setCurrentSessionId] = useState(null)
 
+  const handleResetSession = () => {
+    setGrids([])
+    setLastQuery(null)
+    setTableQuery(null)
+    setLastDetailYn(null)
+    setTableName(null)
+    setHeaderColumns(null)
+    setLastColumns(null)
+    // Start a new ChatQ session
+    const newId = Date.now()
+    setSessions(prev => [...prev, { id: newId, firstQuery: null, startedAt: new Date() }])
+    setCurrentSessionId(newId)
+    return newId
+  }
+
   const handleLogin = async (e) => {
     e.preventDefault()
     const formData = new FormData(e.target)
@@ -56,7 +71,7 @@ const App = () => {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/login`, {
         user: username,
-        password:password
+        password: password
       })
 
       // 응답 메시지 확인
@@ -73,7 +88,7 @@ const App = () => {
       setUserNm(response.data.user_nm)
       // 사용자 아이디 저장 (우선 서버 응답, 없으면 입력값 사용)
       setUser(response.data.user || username)
-      
+
       setShowLoginModal(false)
       // 비밀번호 초기화 상태면 안내 메시지와 함께 사용자정보 모달 오픈
       const pwdFiredYn = response.data.pwdFiredYn ?? response.data.pwd_fired_yn
@@ -92,7 +107,7 @@ const App = () => {
     }
   }
 
-  const handleSend = async (overridePrompt = null, sessionIdForFirstQuery = null) => {
+  const handleSend = async (overridePrompt = null, sessionIdForFirstQuery = null, ignoreContext = false) => {
     const effectivePrompt = overridePrompt !== null ? overridePrompt : query
     if (effectivePrompt.trim()) {
       setIsLoading(true)
@@ -100,12 +115,14 @@ const App = () => {
         const postData = {
           prompt: effectivePrompt
         }
-        if (lastQuery) postData.lastQuery = lastQuery
-        if (tableQuery) postData.tableQuery = tableQuery
-        if (lastDetailYn) postData.lastDetailYn = lastDetailYn
-        if (tableName) postData.tableName = tableName
-        if (headerColumns) postData.headerColumns = headerColumns
-        if (lastColumns) postData.lastColumns = lastColumns
+        if (!ignoreContext) {
+          if (lastQuery) postData.lastQuery = lastQuery
+          if (tableQuery) postData.tableQuery = tableQuery
+          if (lastDetailYn) postData.lastDetailYn = lastDetailYn
+          if (tableName) postData.tableName = tableName
+          if (headerColumns) postData.headerColumns = headerColumns
+          if (lastColumns) postData.lastColumns = lastColumns
+        }
 
         const response = await axios.post(qurl, postData)
 
@@ -113,11 +130,11 @@ const App = () => {
           key: col,
           label: col.charAt(0).toUpperCase() + col.slice(1)
         }))
-        const headerColumnsData = response.data.headerColumns 
+        const headerColumnsData = response.data.headerColumns
           ? response.data.headerColumns.map(col => ({
-              key: col,
-              label: col.charAt(0).toUpperCase() + col.slice(1)
-            }))
+            key: col,
+            label: col.charAt(0).toUpperCase() + col.slice(1)
+          }))
           : []
 
         setGrids(prevGrids => [...prevGrids, {
@@ -164,20 +181,9 @@ const App = () => {
   const handleReplay = (firstQuery) => {
     if (!firstQuery) return
     // Reset conversation state
-    setGrids([])
-    setLastQuery(null)
-    setTableQuery(null)
-    setLastDetailYn(null)
-    setTableName(null)
-    setHeaderColumns(null)
-    setLastColumns(null)
-    // Set the query input to show the replayed query
+    const newId = handleResetSession()
     setQuery(firstQuery)
-    // Prepare new session id and immediately dispatch send using that id
-    const newId = Date.now()
-    setSessions(prev => [...prev, { id: newId, firstQuery: null, startedAt: new Date() }])
-    setCurrentSessionId(newId)
-    handleSend(firstQuery, newId)
+    handleSend(firstQuery, newId, true)
   }
 
   useEffect(() => {
@@ -286,78 +292,57 @@ const App = () => {
         <div className="flex">
           <div className="hidden md:block w-64" />
           <div className="flex-1 pr-2">
-          <h1
-            className="text-4xl font-bold text-white mb-6 text-center flex items-center justify-center gap-3 cursor-pointer select-none hover:opacity-90"
-            role="button"
-            tabIndex={0}
-            title="새 ChatQ 시작"
-            onClick={() => {
-              setGrids([])
-              setLastQuery(null)
-              setTableQuery(null)
-              setLastDetailYn(null)
-              setTableName(null)
-              setHeaderColumns(null)
-              setLastColumns(null)
-              // Start a new ChatQ session
-              const newId = Date.now()
-              setSessions(prev => [...prev, { id: newId, firstQuery: null, startedAt: new Date() }])
-              setCurrentSessionId(newId)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                setGrids([])
-                setLastQuery(null)
-                setTableQuery(null)
-                setLastDetailYn(null)
-                setTableName(null)
-                setHeaderColumns(null)
-                setLastColumns(null)
-                const newId = Date.now()
-                setSessions(prev => [...prev, { id: newId, firstQuery: null, startedAt: new Date() }])
-                setCurrentSessionId(newId)
-              }
-            }}
-          >
-            <img src={chatqLogo} alt="ChatQ Logo" className="h-8 w-8" />
-            ChatQ
-          </h1>
-          <div className="relative">
-            <img src={chatqLogo} alt="ChatQ" className="absolute left-3 top-1/2 -translate-y-1/2 h-6 w-6" />
-            <input 
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+            <h1
+              className="text-4xl font-bold text-white mb-6 text-center flex items-center justify-center gap-3 cursor-pointer select-none hover:opacity-90"
+              role="button"
+              tabIndex={0}
+              title="새 ChatQ 시작"
+              onClick={handleResetSession}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !isLoading) {
-                  handleSend()
+                if (e.key === 'Enter' || e.key === ' ') {
+                  handleResetSession()
                 }
               }}
-              placeholder="DB에서 조회하고 싶은 것을 물어보세요..."
-              className="w-full p-3 pl-12 pr-12 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 focus:outline-none focus:border-slate-500 appearance-none !bg-slate-800 !text-slate-200 !border-slate-700"
-              autoComplete="off"
-            />
-            <button 
-              onClick={handleSend}
-              disabled={isLoading}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md transition-colors
-                ${isLoading 
-                  ? 'text-blue-400 cursor-not-allowed' 
-                  : 'text-blue-500 hover:text-blue-400 hover:bg-slate-700'}`}
-              aria-label="Send"
             >
-              {isLoading ? (
-                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              ) : (
-                <svg className="h-5 w-5 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-              )}
-            </button>
-          </div>
+              <img src={chatqLogo} alt="ChatQ Logo" className="h-8 w-8" />
+              ChatQ
+            </h1>
+            <div className="relative">
+              <img src={chatqLogo} alt="ChatQ" className="absolute left-3 top-1/2 -translate-y-1/2 h-6 w-6" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isLoading) {
+                    handleSend()
+                  }
+                }}
+                placeholder="DB에서 조회하고 싶은 것을 물어보세요..."
+                className="w-full p-3 pl-12 pr-12 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 focus:outline-none focus:border-slate-500 appearance-none !bg-slate-800 !text-slate-200 !border-slate-700"
+                autoComplete="off"
+              />
+              <button
+                onClick={() => handleSend()}
+                disabled={isLoading}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md transition-colors
+                ${isLoading
+                    ? 'text-blue-400 cursor-not-allowed'
+                    : 'text-blue-500 hover:text-blue-400 hover:bg-slate-700'}`}
+                aria-label="Send"
+              >
+                {isLoading ? (
+                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -374,91 +359,91 @@ const App = () => {
             )}
             {sessions
               .filter(s => s.firstQuery)
-              .sort((a,b) => new Date(b.startedAt) - new Date(a.startedAt))
+              .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
               .map(s => (
-              <li key={s.id} className="group relative">
-                <button
-                  type="button"
-                  onClick={() => handleReplay(s.firstQuery)}
-                  className="w-full text-left text-xs text-slate-300 hover:bg-slate-800/60 rounded px-1 py-1"
-                  title={`다시 실행: ${s.firstQuery}`}
-                >
-                  <span
-                    className="block w-full px-2 py-1 rounded bg-slate-800/70 group-hover:bg-slate-700/70 transition-colors overflow-hidden whitespace-nowrap text-ellipsis"
+                <li key={s.id} className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => handleReplay(s.firstQuery)}
+                    className="w-full text-left text-xs text-slate-300 hover:bg-slate-800/60 rounded px-1 py-1"
+                    title={`다시 실행: ${s.firstQuery}`}
                   >
+                    <span
+                      className="block w-full px-2 py-1 rounded bg-slate-800/70 group-hover:bg-slate-700/70 transition-colors overflow-hidden whitespace-nowrap text-ellipsis"
+                    >
+                      {s.firstQuery}
+                    </span>
+                  </button>
+                  {/* Hover full content tooltip */}
+                  <div className="pointer-events-none absolute left-0 top-full mt-1 z-10 hidden group-hover:block bg-slate-800 text-slate-200 text-xs p-2 rounded shadow-lg max-w-xs whitespace-pre-wrap break-words">
                     {s.firstQuery}
-                  </span>
-                </button>
-                {/* Hover full content tooltip */}
-                <div className="pointer-events-none absolute left-0 top-full mt-1 z-10 hidden group-hover:block bg-slate-800 text-slate-200 text-xs p-2 rounded shadow-lg max-w-xs whitespace-pre-wrap break-words">
-                  {s.firstQuery}
-                </div>
-              </li>
-            ))}
+                  </div>
+                </li>
+              ))}
           </ul>
         </aside>
         {/* Main content */}
         <div className="flex-1 p-4">
           <div className="space-y-6 mt-4">
-          {grids.map(grid => (
-            <div key={grid.id} className="bg-slate-800 p-4 rounded-lg">
-              <div className="text-slate-300 mb-4 font-medium flex items-center justify-between">
-                <span>Query: {grid.query}</span>
-                <div className="flex items-center gap-0">
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(grid.query)
-                    }}
-                    className="p-1 hover:bg-slate-700 rounded-md transition-colors text-slate-400 hover:text-slate-300"
-                    title="쿼리 복사"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Excel export logic will go here
-                      const csv = [
-                        grid.columns.map(col => col.label).join(','),
-                        ...grid.data.map(row => 
-                          grid.columns.map(col => {
-                            const value = row[col.key]
-                            return typeof value === 'string' && value.includes(',') 
-                              ? `"${value}"` 
-                              : value
-                          }).join(',')
-                        )
-                      ].join('\n')
-                      
-                      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-                      const link = document.createElement('a')
-                      link.href = URL.createObjectURL(blob)
-                      link.download = `chatq_${grid.id}.csv`
-                      link.click()
-                    }}
-                    className="p-1 hover:bg-slate-700 rounded-md transition-colors text-green-500 hover:text-green-400"
-                    title="Excel로 다운로드"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </button>
+            {grids.map(grid => (
+              <div key={grid.id} className="bg-slate-800 p-4 rounded-lg">
+                <div className="text-slate-300 mb-4 font-medium flex items-center justify-between">
+                  <span>Query: {grid.query}</span>
+                  <div className="flex items-center gap-0">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(grid.query)
+                      }}
+                      className="p-1 hover:bg-slate-700 rounded-md transition-colors text-slate-400 hover:text-slate-300"
+                      title="쿼리 복사"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Excel export logic will go here
+                        const csv = [
+                          grid.columns.map(col => col.label).join(','),
+                          ...grid.data.map(row =>
+                            grid.columns.map(col => {
+                              const value = row[col.key]
+                              return typeof value === 'string' && value.includes(',')
+                                ? `"${value}"`
+                                : value
+                            }).join(',')
+                          )
+                        ].join('\n')
+
+                        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+                        const link = document.createElement('a')
+                        link.href = URL.createObjectURL(blob)
+                        link.download = `chatq_${grid.id}.csv`
+                        link.click()
+                      }}
+                      className="p-1 hover:bg-slate-700 rounded-md transition-colors text-green-500 hover:text-green-400"
+                      title="Excel로 다운로드"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
+                <DataGrid
+                  data={grid.data}
+                  columns={grid.columns}
+                  headerData={grid.headerData}
+                  headerColumns={grid.headerColumns}
+                  detailYn={grid.detailYn}
+                />
               </div>
-              <DataGrid 
-                data={grid.data} 
-                columns={grid.columns} 
-                headerData={grid.headerData}
-                headerColumns={grid.headerColumns}
-                detailYn={grid.detailYn}  
-              />
-            </div>
-          ))}
-          <div ref={bottomRef} />
+            ))}
+            <div ref={bottomRef} />
+          </div>
         </div>
-      </div>
-      {/* Close flex layout */}
+        {/* Close flex layout */}
       </div>
 
       {/* Login Modal */}
