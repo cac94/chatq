@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Modal from './Modal'
 import axios from 'axios'
 
-const UserManagement = ({ isOpen, onClose, apiBaseUrl }) => {
+const UserManagement = ({ isOpen, onClose }) => {
   const [users, setUsers] = useState([])
   const [authOptions, setAuthOptions] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -26,7 +26,7 @@ const UserManagement = ({ isOpen, onClose, apiBaseUrl }) => {
   const loadUsers = async () => {
     try {
       // TODO: Replace with actual API endpoint
-      const response = await axios.get(`${apiBaseUrl}/api/users`)
+      const response = await axios.get('/api/users')
       setUsers(response.data)
     } catch (error) {
       console.error('Failed to load users:', error)
@@ -40,7 +40,7 @@ const UserManagement = ({ isOpen, onClose, apiBaseUrl }) => {
 
   const loadAuthOptions = async () => {
     try {
-      const response = await axios.get(`${apiBaseUrl}/api/auth-options`)
+      const response = await axios.get('/api/auth-options')
       setAuthOptions(response.data)
     } catch (error) {
       console.error('Failed to load auth options:', error)
@@ -79,7 +79,7 @@ const UserManagement = ({ isOpen, onClose, apiBaseUrl }) => {
     if (window.confirm(`사용자 '${userId}'를 삭제하시겠습니까?`)) {
       try {
         // TODO: Replace with actual API endpoint
-        await axios.delete(`${apiBaseUrl}/api/users/${userId}`)
+        await axios.delete(`/api/users/${userId}`)
         loadUsers()
       } catch (error) {
         console.error('Failed to delete user:', error)
@@ -92,7 +92,7 @@ const UserManagement = ({ isOpen, onClose, apiBaseUrl }) => {
     if (window.confirm(`사용자 '${userId}'의 비밀번호를 초기화하시겠습니까?`)) {
       try {
         // TODO: Replace with actual API endpoint
-        await axios.post(`${apiBaseUrl}/api/users/${userId}/reset-password`)
+        await axios.post(`/api/users/${userId}/reset-password`)
         alert('비밀번호가 초기화되었습니다.')
       } catch (error) {
         console.error('Failed to reset password:', error)
@@ -105,10 +105,10 @@ const UserManagement = ({ isOpen, onClose, apiBaseUrl }) => {
     try {
       if (isAddingNew) {
         // TODO: Replace with actual API endpoint
-        await axios.post(`${apiBaseUrl}/api/users`, formData)
+        await axios.post('/api/users', formData)
       } else {
         // TODO: Replace with actual API endpoint
-        await axios.put(`${apiBaseUrl}/api/users/${editingUser.user}`, formData)
+        await axios.put(`/api/users/${editingUser.user}`, formData)
       }
       setIsAddingNew(false)
       setEditingUser(null)

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Modal from './Modal'
 import axios from 'axios'
 
-const AuthManagement = ({ isOpen, onClose, apiBaseUrl }) => {
+const AuthManagement = ({ isOpen, onClose }) => {
   const [auths, setAuths] = useState([])
   const [infoOptions, setInfoOptions] = useState([])
   const [editingAuth, setEditingAuth] = useState(null)
@@ -23,7 +23,7 @@ const AuthManagement = ({ isOpen, onClose, apiBaseUrl }) => {
   const loadAuths = async () => {
     try {
       // TODO: Replace with actual API endpoint
-      const response = await axios.get(`${apiBaseUrl}/api/auths`)
+      const response = await axios.get('/api/auths')
       setAuths(response.data)
     } catch (error) {
       console.error('Failed to load auths:', error)
@@ -38,7 +38,7 @@ const AuthManagement = ({ isOpen, onClose, apiBaseUrl }) => {
   const loadInfoOptions = async () => {
     try {
       // TODO: Replace with actual API endpoint
-      const response = await axios.get(`${apiBaseUrl}/api/infos`)
+      const response = await axios.get('/api/infos')
       setInfoOptions(response.data)
     } catch (error) {
       console.error('Failed to load auth info options:', error)
@@ -71,7 +71,7 @@ const AuthManagement = ({ isOpen, onClose, apiBaseUrl }) => {
     if (window.confirm(`권한 '${authId}'를 삭제하시겠습니까?`)) {
       try {
         // TODO: Replace with actual API endpoint
-        await axios.delete(`${apiBaseUrl}/api/auths/${authId}`)
+        await axios.delete(`/api/auths/${authId}`)
         loadAuths()
       } catch (error) {
         console.error('Failed to delete auth:', error)
@@ -89,10 +89,10 @@ const AuthManagement = ({ isOpen, onClose, apiBaseUrl }) => {
       }
       if (isAddingNew) {
         // TODO: Replace with actual API endpoint
-        await axios.post(`${apiBaseUrl}/api/auths`, saveData)
+        await axios.post('/api/auths', saveData)
       } else {
         // TODO: Replace with actual API endpoint
-        await axios.put(`${apiBaseUrl}/api/auths/${editingAuth.auth}`, saveData)
+        await axios.put(`/api/auths/${editingAuth.auth}`, saveData)
       }
       setIsAddingNew(false)
       setEditingAuth(null)

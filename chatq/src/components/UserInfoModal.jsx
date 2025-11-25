@@ -2,7 +2,7 @@ import { useState } from 'react'
 import axios from 'axios'
 import Modal from './Modal'
 
-const UserInfoModal = ({ isOpen, onClose, user, userName, auth, level, infos, onLogout, apiBaseUrl }) => {
+const UserInfoModal = ({ isOpen, onClose, user, userName, auth, level, infos, onLogout }) => {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
@@ -17,7 +17,7 @@ const UserInfoModal = ({ isOpen, onClose, user, userName, auth, level, infos, on
     }
     // TODO: 비밀번호 변경 API 호출
     try {
-      await axios.put(`${apiBaseUrl}/api/users/password`, { newPassword: password })
+      await axios.put('/api/users/password', { newPassword: password })
       alert('비밀번호가 변경되었습니다.')
       setPassword('')
       setConfirmPassword('')

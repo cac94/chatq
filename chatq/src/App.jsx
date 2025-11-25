@@ -10,8 +10,6 @@ import AuthManagement from './components/AuthManagement'
 import InfoManagement from './components/InfoManagement'
 import chatqLogo from './assets/chatqicon51x51.png'
 
-const API_BASE_URL = 'http://localhost:8080'
-
 // Configure axios to send cookies with requests
 axios.defaults.withCredentials = true
 
@@ -34,7 +32,7 @@ const App = () => {
   const [userNm, setUserNm] = useState(null)
   const bottomRef = useRef(null)
   const inputContainerRef = useRef(null)
-  const qurl = `${API_BASE_URL}/api/chatq` // Your API endpoint
+  const qurl = '/api/chatq' // Your API endpoint
 
   // Store lastQuery and tableQuery from previous response
   const [lastQuery, setLastQuery] = useState(null)
@@ -69,7 +67,7 @@ const App = () => {
     const password = formData.get('password')
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/login`, {
+      const response = await axios.post('/api/login', {
         user: username,
         password: password
       })
@@ -148,7 +146,7 @@ const App = () => {
         }])
 
         // Set firstQuery for session if absent (supports replay where session id provided directly)
-        const targetSessionId = sessionIdForFirstQuery || currentSessionId
+        const targetSessionId = sessionIdForFirstQuery !== null ? sessionIdForFirstQuery : currentSessionId
         setSessions(prev => prev.map(s => {
           if (s.id === targetSessionId && !s.firstQuery) {
             return { ...s, firstQuery: effectivePrompt }
@@ -196,7 +194,7 @@ const App = () => {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/check-session`)
+        const response = await axios.get('/api/check-session')
         if (response.data && response.data.user) {
           // Restore user state from session
           setAuth(response.data.auth || 'GUEST')
@@ -219,7 +217,7 @@ const App = () => {
       setSessions([{ id: newId, firstQuery: null, startedAt: new Date() }])
       setCurrentSessionId(newId)
     }
-  }, [])
+  }, [sessions.length])
 
   // After alert is closed, open UserInfoModal if requested
   useEffect(() => {
@@ -355,7 +353,7 @@ const App = () => {
           <h2 className="text-slate-400 text-sm font-semibold mb-3">내 ChatQ 주제</h2>
           <ul className="space-y-2 pr-1">
             {sessions.filter(s => s.firstQuery).length === 0 && (
-              <li className="text-slate-500 text-xs">아직 첫 쿼리가 없습니다.</li>
+              <li className="text-slate-500 text-xs">아직 조회가 없습니다.</li>
             )}
             {sessions
               .filter(s => s.firstQuery)
@@ -385,6 +383,23 @@ const App = () => {
         {/* Main content */}
         <div className="flex-1 p-4">
           <div className="space-y-6 mt-4">
+            {grids.length === 0 && (
+              <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="text-center text-slate-500 max-w-2xl">
+                  <div className="font-semibold text-lg mb-3">ChatQ 사용 팁</div>
+                  <ul className="list-disc text-left inline-block space-y-1.5">
+                    <li>우측 상단의 사용자 정보 아이콘을 클릭하여 접근가능정보를 확인하세요.</li>
+                    <li>접근가능정보를 문의 내용에 포함하면 더 정확한 답변을 받을 수 있습니다.</li>
+                    <li>첫 문의를 입력할 때는 되도록 정보내역을 조회하세요.(예: 홍길동의 2025년 7월 발주내역)</li>
+                    <li>동일한 정보 안에서 질문을 이어가세요.(예1: 그 다음 달은?, 예2: 총 건수와 총금액은?)</li>
+                    <li>다른 정보를 조회할 때는 ChatQ 로고를 클릭하여 새 ChatQ를 시작하세요.</li>
+                    <li>좌측 이력에서 내 ChatQ 주제를 클릭하면 동일 주제를 다시 실행합니다.</li>
+                    <li>데이터가 많을 경우 자동으로 개수를 제한합니다.</li>
+                    <li>정보중에 상세내역인 경우는 요약정보로 제공됩니다. 클릭하면 상세내역을 확인할 수 있습니다.</li>
+                  </ul>
+                </div>
+              </div>
+            )}
             {grids.map(grid => (
               <div key={grid.id} className="bg-slate-800 p-4 rounded-lg">
                 <div className="text-slate-300 mb-4 font-medium flex items-center justify-between">
@@ -490,10 +505,9 @@ const App = () => {
         auth={auth}
         level={level}
         infos={infos ? infos.join(', ') : ''}
-        apiBaseUrl={API_BASE_URL}
         onLogout={async () => {
           try {
-            await axios.post(`${API_BASE_URL}/api/logout`)
+            await axios.post('/api/logout')
             setAuth(null)
             setUser(null)
             setInfos(null)
@@ -506,6 +520,8 @@ const App = () => {
             setTableName(null)
             setHeaderColumns(null)
             setLastColumns(null)
+            setSessions([])
+            setCurrentSessionId(null)
             setShowUserInfoModal(false)
             setAlertMessage('로그아웃되었습니다.')
             setShowAlert(true)
@@ -521,21 +537,18 @@ const App = () => {
       <UserManagement
         isOpen={showUserManagement}
         onClose={() => setShowUserManagement(false)}
-        apiBaseUrl={API_BASE_URL}
       />
 
       {/* Auth Management Modal */}
       <AuthManagement
         isOpen={showAuthManagement}
         onClose={() => setShowAuthManagement(false)}
-        apiBaseUrl={API_BASE_URL}
       />
 
       {/* Info Management Modal */}
       <InfoManagement
         isOpen={showInfoManagement}
         onClose={() => setShowInfoManagement(false)}
-        apiBaseUrl={API_BASE_URL}
       />
     </div>
   )

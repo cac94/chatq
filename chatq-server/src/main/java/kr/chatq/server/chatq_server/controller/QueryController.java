@@ -33,6 +33,11 @@ public class QueryController {
     @Autowired
     private QueryService queryService;
 
+    @GetMapping("/test")
+    public ResponseEntity<String> executeTest() {
+        return ResponseEntity.ok("response from test endpoint");
+    }
+
     @PostMapping("/q")
     public ResponseEntity<QueryResponse> executeQuery(@RequestBody QueryRequest request) {
         try {
