@@ -9,12 +9,16 @@ import UserManagement from './components/UserManagement'
 import AuthManagement from './components/AuthManagement'
 import InfoManagement from './components/InfoManagement'
 import chatqLogo from './assets/chatqicon51x51.png'
+import translations from './translation'
 
 // Configure axios to send cookies with requests
 axios.defaults.withCredentials = true
 
+
+
 const App = () => {
   const [grids, setGrids] = useState([])
+  const [language, setLanguage] = useState(navigator.language.startsWith('ko') ? 'ko' : 'en')
   const [query, setQuery] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
@@ -74,7 +78,7 @@ const App = () => {
 
       // 응답 메시지 확인
       if (response.data.message === 'FAIL') {
-        setAlertMessage('로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.')
+        setAlertMessage(translations[language].loginFail)
         setShowAlert(true)
         return
       }
@@ -91,16 +95,16 @@ const App = () => {
       // 비밀번호 초기화 상태면 안내 메시지와 함께 사용자정보 모달 오픈
       const pwdFiredYn = response.data.pwdFiredYn ?? response.data.pwd_fired_yn
       if (pwdFiredYn === 'Y') {
-        setAlertMessage(`${response.data.user_nm}님 환영합니다! 비번을 수정해주세요.`)
+        setAlertMessage(translations[language].welcomePwd.replace('{name}', response.data.user_nm))
         setOpenUserInfoAfterAlert(true)
       } else {
-        setAlertMessage(`${response.data.user_nm}님 환영합니다!`)
+        setAlertMessage(translations[language].welcome.replace('{name}', response.data.user_nm))
         setOpenUserInfoAfterAlert(false)
       }
       setShowAlert(true)
     } catch (error) {
       console.error('Login Error:', error)
-      setAlertMessage('로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.')
+      setAlertMessage(translations[language].loginFail)
       setShowAlert(true)
     }
   }
@@ -167,7 +171,7 @@ const App = () => {
         setQuery('')
       } catch (error) {
         console.error('API Error:', error)
-        setAlertMessage('조회를 실패했습니다. 좀 더 구체적으로 입력해보시거나 상단의 ChatQ 로고를 클릭하여 새로 시작해보세요.')
+        setAlertMessage(translations[language].apiError)
         setShowAlert(true)
       } finally {
         setIsLoading(false)
@@ -233,6 +237,13 @@ const App = () => {
       <div className="sticky top-0 bg-slate-900 p-4 shadow-lg z-50" ref={inputContainerRef}>
         {/* Header actions (float right) */}
         <div className="absolute top-4 right-4 flex items-center gap-2 z-[60]">
+          <button
+            className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-300 hover:text-white font-medium"
+            onClick={() => setLanguage(prev => prev === 'ko' ? 'en' : 'ko')}
+            title="언어 변경 / Change Language"
+          >
+            {language === 'ko' ? 'EN' : 'KO'}
+          </button>
           {level === 1 && (
             <>
               <button
@@ -240,7 +251,7 @@ const App = () => {
                 onClick={() => {
                   setShowUserManagement(true)
                 }}
-                title="사용자 관리"
+                title={translations[language].userMgmt}
               >
                 <svg className="h-6 w-6 text-slate-300 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -251,7 +262,7 @@ const App = () => {
                 onClick={() => {
                   setShowAuthManagement(true)
                 }}
-                title="권한 관리"
+                title={translations[language].authMgmt}
               >
                 <svg className="h-6 w-6 text-slate-300 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -262,7 +273,7 @@ const App = () => {
                 onClick={() => {
                   setShowInfoManagement(true)
                 }}
-                title="정보 관리"
+                title={translations[language].infoMgmt}
               >
                 <svg className="h-6 w-6 text-slate-300 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -279,7 +290,7 @@ const App = () => {
                 setShowLoginModal(true)
               }
             }}
-            title={userNm ? "사용자 정보" : "로그인"}
+            title={userNm ? translations[language].userInfo : translations[language].login}
           >
             <svg className="h-6 w-6 text-slate-300 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -294,7 +305,8 @@ const App = () => {
               className="text-4xl font-bold text-white mb-6 text-center flex items-center justify-center gap-3 cursor-pointer select-none hover:opacity-90"
               role="button"
               tabIndex={0}
-              title="새 ChatQ 시작"
+
+              title={translations[language].newChatQ}
               onClick={handleResetSession}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -316,7 +328,7 @@ const App = () => {
                     handleSend()
                   }
                 }}
-                placeholder="DB에서 조회하고 싶은 것을 물어보세요..."
+                placeholder={translations[language].inputPlaceholder}
                 className="w-full p-3 pl-12 pr-12 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 focus:outline-none focus:border-slate-500 appearance-none !bg-slate-800 !text-slate-200 !border-slate-700"
                 autoComplete="off"
               />
@@ -350,10 +362,10 @@ const App = () => {
         {/* Sidebar */}
         {/* Sticky sidebar so history stays visible while scrolling */}
         <aside className="hidden md:block w-64 p-4 border-r border-slate-800 bg-slate-900/80 sticky top-24 h-[calc(100vh-6rem)] overflow-y-auto" style={{ paddingTop: '50px' }}>
-          <h2 className="text-slate-400 text-sm font-semibold mb-3">내 ChatQ 주제</h2>
+          <h2 className="text-slate-400 text-sm font-semibold mb-3">{translations[language].myChatQTopics}</h2>
           <ul className="space-y-2 pr-1">
             {sessions.filter(s => s.firstQuery).length === 0 && (
-              <li className="text-slate-500 text-xs">아직 조회가 없습니다.</li>
+              <li className="text-slate-500 text-xs">{translations[language].noHistory}</li>
             )}
             {sessions
               .filter(s => s.firstQuery)
@@ -364,7 +376,7 @@ const App = () => {
                     type="button"
                     onClick={() => handleReplay(s.firstQuery)}
                     className="w-full text-left text-xs text-slate-300 hover:bg-slate-800/60 rounded px-1 py-1"
-                    title={`다시 실행: ${s.firstQuery}`}
+                    title={`${translations[language].replay}: ${s.firstQuery}`}
                   >
                     <span
                       className="block w-full px-2 py-1 rounded bg-slate-800/70 group-hover:bg-slate-700/70 transition-colors overflow-hidden whitespace-nowrap text-ellipsis"
@@ -386,16 +398,12 @@ const App = () => {
             {grids.length === 0 && (
               <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="text-center text-slate-500 max-w-2xl">
-                  <div className="font-semibold text-lg mb-3">ChatQ 사용 팁</div>
+                  <div className="font-semibold text-lg mb-3">{translations[language].tipsTitle}</div>
+                  <div className="text-sm mb-4 text-left">{translations[language].tipsSubtitle}</div>
                   <ul className="list-disc text-left inline-block space-y-1.5">
-                    <li>우측 상단의 사용자 정보 아이콘을 클릭하여 접근가능정보를 확인하세요.</li>
-                    <li>접근가능정보를 문의 내용에 포함하면 더 정확한 답변을 받을 수 있습니다.</li>
-                    <li>첫 문의를 입력할 때는 되도록 정보내역을 조회하세요.(예: 홍길동의 2025년 7월 발주내역)</li>
-                    <li>동일한 정보 안에서 질문을 이어가세요.(예1: 그 다음 달은?, 예2: 총 건수와 총금액은?)</li>
-                    <li>다른 정보를 조회할 때는 ChatQ 로고를 클릭하여 새 ChatQ를 시작하세요.</li>
-                    <li>좌측 이력에서 내 ChatQ 주제를 클릭하면 동일 주제를 다시 실행합니다.</li>
-                    <li>데이터가 많을 경우 자동으로 개수를 제한합니다.</li>
-                    <li>정보중에 상세내역인 경우는 요약정보로 제공됩니다. 클릭하면 상세내역을 확인할 수 있습니다.</li>
+                    {translations[language].tips.map((tip, index) => (
+                      <li key={index}>{tip}</li>
+                    ))}
                   </ul>
                 </div>
               </div>
@@ -410,7 +418,7 @@ const App = () => {
                         navigator.clipboard.writeText(grid.query)
                       }}
                       className="p-1 hover:bg-slate-700 rounded-md transition-colors text-slate-400 hover:text-slate-300"
-                      title="쿼리 복사"
+                      title={translations[language].copyQuery}
                     >
                       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -438,7 +446,7 @@ const App = () => {
                         link.click()
                       }}
                       className="p-1 hover:bg-slate-700 rounded-md transition-colors text-green-500 hover:text-green-400"
-                      title="Excel로 다운로드"
+                      title={translations[language].downloadExcel}
                     >
                       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -466,35 +474,39 @@ const App = () => {
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
         onSubmit={handleLogin}
+        language={language}
+        translations={translations}
       />
 
       {/* Alert Modal */}
-      {showAlert && (
-        <Modal isOpen={showAlert} onClose={() => setShowAlert(false)}>
-          <div className="w-96 mx-auto">
-            <div className="flex flex-col items-center">
-              <div className="mb-4">
-                <svg className="h-12 w-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+      {
+        showAlert && (
+          <Modal isOpen={showAlert} onClose={() => setShowAlert(false)}>
+            <div className="w-96 mx-auto">
+              <div className="flex flex-col items-center">
+                <div className="mb-4">
+                  <svg className="h-12 w-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className="text-white text-center mb-6 whitespace-pre-line">{alertMessage}</p>
+                <button
+                  onClick={() => setShowAlert(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setShowAlert(false)
+                    }
+                  }}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                  autoFocus
+                >
+                  {translations[language].confirm}
+                </button>
               </div>
-              <p className="text-white text-center mb-6 whitespace-pre-line">{alertMessage}</p>
-              <button
-                onClick={() => setShowAlert(false)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setShowAlert(false)
-                  }
-                }}
-                className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-                autoFocus
-              >
-                확인
-              </button>
             </div>
-          </div>
-        </Modal>
-      )}
+          </Modal>
+        )
+      }
 
       {/* User Info Modal */}
       <UserInfoModal
@@ -505,6 +517,8 @@ const App = () => {
         auth={auth}
         level={level}
         infos={infos ? infos.join(', ') : ''}
+        language={language}
+        translations={translations}
         onLogout={async () => {
           try {
             await axios.post('/api/logout')
@@ -523,11 +537,11 @@ const App = () => {
             setSessions([])
             setCurrentSessionId(null)
             setShowUserInfoModal(false)
-            setAlertMessage('로그아웃되었습니다.')
+            setAlertMessage(translations[language].logoutSuccess)
             setShowAlert(true)
           } catch (error) {
             console.error('Logout Error:', error)
-            setAlertMessage('로그아웃 처리 중 오류가 발생했습니다.')
+            setAlertMessage(translations[language].logoutError)
             setShowAlert(true)
           }
         }}
@@ -550,7 +564,7 @@ const App = () => {
         isOpen={showInfoManagement}
         onClose={() => setShowInfoManagement(false)}
       />
-    </div>
+    </div >
   )
 }
 
