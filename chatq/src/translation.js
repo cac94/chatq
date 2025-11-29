@@ -51,7 +51,22 @@ const translations = {
         pwdEmpty: '비밀번호를 입력해주세요.',
         pwdMismatch: '비밀번호가 일치하지 않습니다.',
         pwdChanged: '비밀번호가 변경되었습니다.',
-        pwdChangeFail: '비밀번호 변경에 실패했습니다.'
+        pwdChangeFail: '비밀번호 변경에 실패했습니다.',
+        chartPromptTitle: '차트 생성',
+        chartPromptPlaceholder: '생성하고 싶은 차트에 대해 설명해주세요...',
+        generateChart: '차트 생성',
+        generate: '생성',
+        chartTypeLabel: '차트 유형',
+        chartTypes: {
+            bar: '막대형',
+            line: '선형',
+            pie: '원형',
+            doughnut: '도넛형',
+            radar: '레이더형',
+            polarArea: '극좌표형',
+            bubble: '버블형',
+            scatter: '산점도'
+        }
     },
     en: {
         tipsTitle: "ChatQ Usage Tips",
@@ -105,7 +120,22 @@ const translations = {
         pwdEmpty: 'Please enter a password.',
         pwdMismatch: 'Passwords do not match.',
         pwdChanged: 'Password changed successfully.',
-        pwdChangeFail: 'Failed to change password.'
+        pwdChangeFail: 'Failed to change password.',
+        chartPromptTitle: 'Generate Chart',
+        chartPromptPlaceholder: 'Describe the chart you want to create...',
+        generateChart: 'Generate Chart',
+        generate: 'Generate',
+        chartTypeLabel: 'Chart Type',
+        chartTypes: {
+            bar: 'Bar',
+            line: 'Line',
+            pie: 'Pie',
+            doughnut: 'Doughnut',
+            radar: 'Radar',
+            polarArea: 'Polar Area',
+            bubble: 'Bubble',
+            scatter: 'Scatter'
+        }
     }
 }
 

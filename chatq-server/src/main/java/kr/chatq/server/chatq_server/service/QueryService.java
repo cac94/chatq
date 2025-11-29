@@ -998,4 +998,238 @@ public class QueryService {
         if (level == null) level = 9;
         return new LoginResponse("SUCCESS", auth, infos, level, user, userName, null);
     }
+
+    /**
+     * 차트 생성을 위한 메서드
+     * 사용자 프롬프트, 차트 타입, 데이터를 받아 AI가 분석하여 차트 데이터를 생성한다.
+     * @param request ChartRequest (prompt, chartType, columns, data)
+     * @return ChartResponse (labels, datasets)
+     */
+    public kr.chatq.server.chatq_server.dto.ChartResponse generateChart(kr.chatq.server.chatq_server.dto.ChartRequest request) {
+        String prompt = request.getPrompt();
+        String chartType = request.getChartType();
+        List<Map<String, String>> columns = request.getColumns();
+        List<Map<String, Object>> data = request.getData();
+        String conversationId = request.getConversationId();
+
+        // PromptMakerService를 사용하여 차트 프롬프트 생성
+        PromptMakerService promptMakerService = new PromptMakerService(new DbService(jdbcTemplate), dataSource);
+        String queryPrompt = promptMakerService.getChartPrompt(prompt, chartType, columns, data);
+
+        try {
+            // // AI에 요청
+            // List<Message> messages = new ArrayList<>();
+            // if (systemPromptStr != null) {
+            //     messages.add(new SystemMessage(systemPromptStr));
+            // }
+            // if (prompt != null) {
+            //     messages.add(new UserMessage(prompt));
+            // }
+
+            // Prompt aiPrompt = new Prompt(messages);
+            // ChatResponse chatResponse;
+            
+            // if ("openai".equalsIgnoreCase(aiType) && openAiApiKey != null && !openAiApiKey.isEmpty()) {
+            //     chatResponse = openAiChatModel.call(aiPrompt);
+            // } else {
+            //     chatResponse = chatModel.call(aiPrompt);
+            // }
+
+            // String aiResponse = chatResponse.getResult().getOutput().getText();
+
+            String aiResponse;
+            if ("openai".equalsIgnoreCase(aiType)) {
+                aiResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(queryPrompt) : sendChatToOpenAI(conversationId, queryPrompt);
+            } else {
+                aiResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(queryPrompt) : sendChatToOllama(conversationId, queryPrompt);
+            }
+
+            logger.info("AI Chart Response: {}", aiResponse);
+
+            if (aiResponse == null || aiResponse.isEmpty()) {
+                return createDefaultChartResponse(data, columns, chartType);
+            }
+
+            // JSON 파싱하여 ChartResponse 생성
+            aiResponse = aiResponse.trim();
+            if (aiResponse.startsWith("```json")) {
+                aiResponse = aiResponse.substring(7);
+            }
+            if (aiResponse.startsWith("```")) {
+                aiResponse = aiResponse.substring(3);
+            }
+            if (aiResponse.endsWith("```")) {
+                aiResponse = aiResponse.substring(0, aiResponse.length() - 3);
+            }
+            aiResponse = aiResponse.trim();
+
+            // 간단한 JSON 파싱 (실제 환경에서는 Jackson 등의 라이브러리 사용 권장)
+            kr.chatq.server.chatq_server.dto.ChartResponse chartResponse = parseChartJson(aiResponse);
+            return chartResponse;
+
+        } catch (Exception e) {
+            logger.error("차트 생성 중 오류 발생", e);
+            // 오류 발생 시 기본 차트 데이터 반환
+            return createDefaultChartResponse(data, columns, chartType);
+        }
+    }
+
+    /**
+     * JSON 문자열을 ChartResponse 객체로 파싱
+     */
+    private kr.chatq.server.chatq_server.dto.ChartResponse parseChartJson(String json) {
+        // 실제 프로덕션 환경에서는 Jackson ObjectMapper 사용 권장
+        // 여기서는 간단한 파싱 구현
+        try {
+            json = json.trim();
+            kr.chatq.server.chatq_server.dto.ChartResponse response = new kr.chatq.server.chatq_server.dto.ChartResponse();
+            
+            // labels 추출
+            List<String> labels = new ArrayList<>();
+            Pattern labelsPattern = Pattern.compile("\"labels\"\\s*:\\s*\\[([^\\]]+)\\]");
+            Matcher labelsMatcher = labelsPattern.matcher(json);
+            if (labelsMatcher.find()) {
+                String labelsStr = labelsMatcher.group(1);
+                String[] labelArray = labelsStr.split(",");
+                for (String label : labelArray) {
+                    label = label.trim().replaceAll("^\"|\"$", "");
+                    labels.add(label);
+                }
+            }
+            response.setLabels(labels);
+
+            // datasets 추출
+            List<kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset> datasets = new ArrayList<>();
+            Pattern datasetPattern = Pattern.compile("\\{[^}]*\"label\"[^}]*\\}");
+            Matcher datasetMatcher = datasetPattern.matcher(json);
+            
+            while (datasetMatcher.find()) {
+                String datasetJson = datasetMatcher.group();
+                kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset dataset = 
+                    new kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset();
+                
+                // label 추출
+                Pattern labelPattern = Pattern.compile("\"label\"\\s*:\\s*\"([^\"]+)\"");
+                Matcher labelMatcher = labelPattern.matcher(datasetJson);
+                if (labelMatcher.find()) {
+                    dataset.setLabel(labelMatcher.group(1));
+                }
+                
+                // data 추출
+                Pattern dataPattern = Pattern.compile("\"data\"\\s*:\\s*\\[([^\\]]+)\\]");
+                Matcher dataMatcher = dataPattern.matcher(datasetJson);
+                if (dataMatcher.find()) {
+                    String dataStr = dataMatcher.group(1);
+                    List<Number> dataList = new ArrayList<>();
+                    String[] dataArray = dataStr.split(",");
+                    for (String d : dataArray) {
+                        d = d.trim();
+                        try {
+                            if (d.contains(".")) {
+                                dataList.add(Double.parseDouble(d));
+                            } else {
+                                dataList.add(Integer.parseInt(d));
+                            }
+                        } catch (NumberFormatException e) {
+                            dataList.add(0);
+                        }
+                    }
+                    dataset.setData(dataList);
+                }
+                
+                // backgroundColor 추출
+                Pattern bgColorPattern = Pattern.compile("\"backgroundColor\"\\s*:\\s*\"([^\"]+)\"");
+                Matcher bgColorMatcher = bgColorPattern.matcher(datasetJson);
+                if (bgColorMatcher.find()) {
+                    dataset.setBackgroundColor(bgColorMatcher.group(1));
+                } else {
+                    dataset.setBackgroundColor("rgba(53, 162, 235, 0.5)");
+                }
+                
+                // borderColor 추출
+                Pattern borderColorPattern = Pattern.compile("\"borderColor\"\\s*:\\s*\"([^\"]+)\"");
+                Matcher borderColorMatcher = borderColorPattern.matcher(datasetJson);
+                if (borderColorMatcher.find()) {
+                    dataset.setBorderColor(borderColorMatcher.group(1));
+                } else {
+                    dataset.setBorderColor("rgb(53, 162, 235)");
+                }
+                
+                // borderWidth 추출
+                Pattern borderWidthPattern = Pattern.compile("\"borderWidth\"\\s*:\\s*(\\d+)");
+                Matcher borderWidthMatcher = borderWidthPattern.matcher(datasetJson);
+                if (borderWidthMatcher.find()) {
+                    dataset.setBorderWidth(Integer.parseInt(borderWidthMatcher.group(1)));
+                } else {
+                    dataset.setBorderWidth(1);
+                }
+                
+                datasets.add(dataset);
+            }
+            response.setDatasets(datasets);
+            
+            return response;
+        } catch (Exception e) {
+            logger.error("JSON 파싱 오류", e);
+            throw new RuntimeException("차트 데이터 파싱 실패", e);
+        }
+    }
+
+    /**
+     * 기본 차트 응답 생성 (AI 호출 실패 시 폴백)
+     */
+    private kr.chatq.server.chatq_server.dto.ChartResponse createDefaultChartResponse(
+            List<Map<String, Object>> data, 
+            List<Map<String, String>> columns,
+            String chartType) {
+        
+        kr.chatq.server.chatq_server.dto.ChartResponse response = new kr.chatq.server.chatq_server.dto.ChartResponse();
+        
+        // 라벨 생성 (첫 번째 컬럼 또는 인덱스)
+        List<String> labels = new ArrayList<>();
+        int sampleSize = Math.min(10, data.size());
+        String labelKey = columns.isEmpty() ? null : columns.get(0).get("key");
+        
+        for (int i = 0; i < sampleSize; i++) {
+            if (labelKey != null && data.get(i).containsKey(labelKey)) {
+                labels.add(String.valueOf(data.get(i).get(labelKey)));
+            } else {
+                labels.add("Item " + (i + 1));
+            }
+        }
+        response.setLabels(labels);
+        
+        // 데이터셋 생성 (숫자 컬럼을 찾아서)
+        List<kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset> datasets = new ArrayList<>();
+        for (int colIdx = 1; colIdx < columns.size(); colIdx++) {
+            String colKey = columns.get(colIdx).get("key");
+            List<Number> dataValues = new ArrayList<>();
+            
+            for (int i = 0; i < sampleSize; i++) {
+                Object value = data.get(i).get(colKey);
+                if (value instanceof Number) {
+                    dataValues.add((Number) value);
+                } else {
+                    try {
+                        dataValues.add(Double.parseDouble(String.valueOf(value)));
+                    } catch (NumberFormatException e) {
+                        dataValues.add(0);
+                    }
+                }
+            }
+            
+            kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset dataset = 
+                new kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset(
+                    columns.get(colIdx).get("label"),
+                    dataValues,
+                    "rgba(53, 162, 235, 0.5)",
+                    "rgb(53, 162, 235)",
+                    1
+                );
+            datasets.add(dataset);
+        }
+        response.setDatasets(datasets);
+        
+        return response;
+    }
 }

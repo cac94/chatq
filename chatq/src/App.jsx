@@ -8,6 +8,8 @@ import UserInfoModal from './components/UserInfoModal'
 import UserManagement from './components/UserManagement'
 import AuthManagement from './components/AuthManagement'
 import InfoManagement from './components/InfoManagement'
+import ChartPromptModal from './components/ChartPromptModal'
+import ChartResultModal from './components/ChartResultModal'
 import chatqLogo from './assets/chatqicon51x51.png'
 import translations from './translation'
 
@@ -34,6 +36,11 @@ const App = () => {
   const [infos, setInfos] = useState(null)
   const [level, setLevel] = useState(9)
   const [userNm, setUserNm] = useState(null)
+  const [showChartModal, setShowChartModal] = useState(false)
+  const [showChartResultModal, setShowChartResultModal] = useState(false)
+  const [chartResult, setChartResult] = useState(null)
+  const [activeGridForChart, setActiveGridForChart] = useState(null)
+  const [activeChartType, setActiveChartType] = useState('bar')
   const bottomRef = useRef(null)
   const inputContainerRef = useRef(null)
   const qurl = '/api/chatq' // Your API endpoint
@@ -62,6 +69,12 @@ const App = () => {
     setSessions(prev => [...prev, { id: newId, firstQuery: null, startedAt: new Date() }])
     setCurrentSessionId(newId)
     return newId
+  }
+
+  const toggleShowDetail = (gridId) => {
+    setGrids(prevGrids => prevGrids.map(grid =>
+      grid.id === gridId ? { ...grid, showDetail: !grid.showDetail } : grid
+    ))
   }
 
   const handleLogin = async (e) => {
@@ -146,7 +159,8 @@ const App = () => {
           columns: columns,
           headerColumns: headerColumnsData,
           headerData: response.data.headerData,
-          detailYn: response.data.detailYn
+          detailYn: response.data.detailYn,
+          showDetail: false
         }])
 
         // Set firstQuery for session if absent (supports replay where session id provided directly)
@@ -186,6 +200,40 @@ const App = () => {
     const newId = handleResetSession()
     setQuery(firstQuery)
     handleSend(firstQuery, newId, true)
+  }
+
+  const handleChartPromptSubmit = async (prompt, chartType) => {
+    console.log('Chart Prompt:', prompt, 'Chart Type:', chartType, 'Grid ID:', activeGridForChart)
+
+    const grid = grids.find(g => g.id === activeGridForChart)
+    if (!grid) return
+
+    // Prepare payload
+    const payload = {
+      prompt,
+      chartType,
+      columns: grid.columns,
+      data: grid.data
+    }
+
+    setIsLoading(true)
+    setShowChartModal(false)
+
+    try {
+      const response = await axios.post('/api/chart', payload)
+      const chartData = response.data
+
+      setChartResult(chartData)
+      setActiveChartType(chartType)
+      setShowChartResultModal(true)
+
+    } catch (error) {
+      console.error('Chart generation failed:', error)
+      setAlertMessage(translations[language].chartError || 'Failed to generate chart. Please try again.')
+      setShowAlert(true)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -393,7 +441,7 @@ const App = () => {
           </ul>
         </aside>
         {/* Main content */}
-        <div className="flex-1 p-4">
+        <div className="flex-1 p-4 min-w-0">
           <div className="space-y-6 mt-4">
             {grids.length === 0 && (
               <div className="flex items-center justify-center min-h-[60vh]">
@@ -424,32 +472,57 @@ const App = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                     </button>
+                    {grid.detailYn === 'Y' && (
+                      <button
+                        onClick={() => toggleShowDetail(grid.id)}
+                        className={`p-1 hover:bg-slate-700 rounded-md transition-colors ${grid.showDetail ? 'text-blue-500' : 'text-slate-400 hover:text-slate-300'}`}
+                        title={grid.showDetail ? "Show Original Data" : "Show Detail Data"}
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                      </button>
+                    )}
                     <button
                       onClick={() => {
-                        // Excel export logic will go here
-                        const csv = [
-                          grid.columns.map(col => col.label).join(','),
-                          ...grid.data.map(row =>
-                            grid.columns.map(col => {
-                              const value = row[col.key]
-                              return typeof value === 'string' && value.includes(',')
-                                ? `"${value}"`
-                                : value
-                            }).join(',')
-                          )
-                        ].join('\n')
-
-                        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-                        const link = document.createElement('a')
-                        link.href = URL.createObjectURL(blob)
-                        link.download = `chatq_${grid.id}.csv`
-                        link.click()
+                        // Generate HTML table for Excel compatibility
+                        const html = `
+                            <html>
+                              <head><meta charset="UTF-8"></head>
+                              <body>
+                                <table>
+                                  <thead>
+                                    <tr>${grid.columns.map(col => `<th>${col.label}</th>`).join('')}</tr>
+                                  </thead>
+                                  <tbody>
+                                    ${grid.data.map(row => `<tr>${grid.columns.map(col => `<td>${row[col.key] ?? ''}</td>`).join('')}</tr>`).join('')}
+                                  </tbody>
+                                </table>
+                              </body>
+                            </html>`;
+                        const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `chatq_${grid.id}.xls`;
+                        link.click();
                       }}
                       className="p-1 hover:bg-slate-700 rounded-md transition-colors text-green-500 hover:text-green-400"
                       title={translations[language].downloadExcel}
                     >
                       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveGridForChart(grid.id)
+                        setShowChartModal(true)
+                      }}
+                      className="p-1 hover:bg-slate-700 rounded-md transition-colors text-purple-500 hover:text-purple-400"
+                      title={translations[language].generateChart || "Generate Chart"}
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                     </button>
                   </div>
@@ -460,6 +533,7 @@ const App = () => {
                   headerData={grid.headerData}
                   headerColumns={grid.headerColumns}
                   detailYn={grid.detailYn}
+                  showDetail={grid.showDetail}
                 />
               </div>
             ))}
@@ -563,6 +637,23 @@ const App = () => {
       <InfoManagement
         isOpen={showInfoManagement}
         onClose={() => setShowInfoManagement(false)}
+      />
+
+      {/* Chart Prompt Modal */}
+      <ChartPromptModal
+        isOpen={showChartModal}
+        onClose={() => setShowChartModal(false)}
+        onSubmit={handleChartPromptSubmit}
+        language={language}
+        translations={translations}
+      />
+
+      {/* Chart Result Modal */}
+      <ChartResultModal
+        isOpen={showChartResultModal}
+        onClose={() => setShowChartResultModal(false)}
+        chartData={chartResult}
+        chartType={activeChartType}
       />
     </div >
   )

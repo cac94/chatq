@@ -7,6 +7,8 @@ import kr.chatq.server.chatq_server.dto.QueryResponse;
 import kr.chatq.server.chatq_server.dto.UserDto;
 import kr.chatq.server.chatq_server.dto.PasswordChangeRequest;
 import kr.chatq.server.chatq_server.dto.AuthDto;
+import kr.chatq.server.chatq_server.dto.ChartRequest;
+import kr.chatq.server.chatq_server.dto.ChartResponse;
 import kr.chatq.server.chatq_server.service.QueryService;
 import kr.chatq.server.chatq_server.dto.ColumnDto;
 
@@ -253,6 +255,16 @@ public class QueryController {
         try {
             queryService.updateInfoColumns(tableNm, column);
             return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/chart")
+    public ResponseEntity<ChartResponse> generateChart(@RequestBody ChartRequest request) {
+        try {
+            ChartResponse response = queryService.generateChart(request);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }

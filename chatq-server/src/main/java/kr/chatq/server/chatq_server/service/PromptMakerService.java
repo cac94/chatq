@@ -130,4 +130,56 @@ public class PromptMakerService {
         conn.close();
         return productName; // 예: "MariaDB"
     }
+
+    /**
+     * 차트 생성을 위한 프롬프트 생성
+     * @param prompt 사용자 프롬프트
+     * @param chartType 차트 타입
+     * @param columns 컬럼 정보
+     * @param data 데이터 샘플
+     * @return 생성된 프롬프트
+     */
+    public String getChartPrompt(String prompt, String chartType, List<Map<String, String>> columns, List<Map<String, Object>> data) {
+        StringBuilder systemPrompt = new StringBuilder();
+        systemPrompt.append("당신은 데이터 분석 전문가입니다. 사용자가 제공한 데이터를 분석하여 차트에 적합한 형태로 변환해야 합니다.\n\n");
+        systemPrompt.append("차트 타입: ").append(chartType).append("\n");
+        systemPrompt.append("컬럼 정보: ").append(columns.toString()).append("\n\n");
+        systemPrompt.append("데이터 샘플 (최대 10개):\n");
+        
+        int sampleSize = Math.min(10, data.size());
+        for (int i = 0; i < sampleSize; i++) {
+            systemPrompt.append(data.get(i).toString()).append("\n");
+        }
+        
+        systemPrompt.append("\n사용자 요청: ").append(prompt).append("\n\n");
+        systemPrompt.append("다음 형식의 JSON으로 응답하세요:\n");
+        systemPrompt.append("{\n");
+        systemPrompt.append("  \"labels\": [\"라벨1\", \"라벨2\", ...],\n");
+        systemPrompt.append("  \"datasets\": [\n");
+        systemPrompt.append("    {\n");
+        systemPrompt.append("      \"label\": \"데이터셋 이름\",\n");
+        systemPrompt.append("      \"data\": [숫자1, 숫자2, ...],\n");
+        systemPrompt.append("      \"backgroundColor\": \"rgba(53, 162, 235, 0.5)\",\n");
+        systemPrompt.append("      \"borderColor\": \"rgb(53, 162, 235)\",\n");
+        systemPrompt.append("      \"borderWidth\": 1\n");
+        systemPrompt.append("    }\n");
+        systemPrompt.append("  ]\n");
+        systemPrompt.append("}\n\n");
+        systemPrompt.append("JSON 외에는 아무것도 출력하지 마세요. 코드 블록 마커(```)도 사용하지 마세요.");
+
+        String generatedPrompt = systemPrompt.toString();
+        
+        // 프롬프트 로그 남기기
+        logger.info("===  ChartPrompt Generated Prompt ===");
+        logger.info("ChartType: {}", chartType);
+        logger.info("UserPrompt: {}", prompt);
+        logger.info("Columns: {}", columns);
+        logger.info("DataSize: {}", data.size());
+        logger.info("Prompt:\n{}", generatedPrompt);
+        logger.info("========================");
+
+        System.out.println("ChartPrompt Generated Prompt: " + generatedPrompt);
+        
+        return generatedPrompt;
+    }
 }
