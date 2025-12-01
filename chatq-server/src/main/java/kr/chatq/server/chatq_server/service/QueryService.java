@@ -265,6 +265,10 @@ public class QueryService {
             tableName = selectedTable != null ? (String) selectedTable.get("table_nm") : null;
             detailYn = selectedTable != null ? (String) selectedTable.get("detail_yn") : null;
             headerColumns = selectedTable != null ? (List<String>) selectedTable.get("headerColumns") : null;
+            //기본값으로 last variables 갱신
+            lastQuery = baseQuery;
+            lastDetailYn = detailYn;
+            lastColumns = selectedTable != null ? (List<String>) selectedTable.get("columnNmList") : null;
         }
 
         // 최종 쿼리 프롬프트 생성
@@ -297,23 +301,15 @@ public class QueryService {
             }
 
             QueryResponse queryResponse = executeQuery(sql, detailYn, headerColumns);
-
-            if(lastQuery == null || lastQuery.isEmpty()) { // 처음 쿼리인 경우
-                lastQuery = sqlOrg;
-                lastColumns = queryResponse.getColumns();
-                lastDetailYn = queryResponse.getDetailYn();
-            }else { // 이후 쿼리인 경우
-                // queryResponse.getColumns() 에 lastColumns 가 포함되면 lastColumns 갱신
-                if (lastColumns != null && !lastColumns.isEmpty()) {
-                    if (queryResponse.getColumns().containsAll(lastColumns)) {
-                        lastColumns = queryResponse.getColumns();
-                        lastQuery = sqlOrg;
-                        lastDetailYn = queryResponse.getDetailYn();
-                    }
-                } else {
+            // queryResponse.getColumns() 에 lastColumns 가 포함되면 lastColumns 갱신
+            if (lastColumns != null && !lastColumns.isEmpty()) {
+                if (queryResponse.getColumns().containsAll(lastColumns)) {
                     lastColumns = queryResponse.getColumns();
+                    lastQuery = sqlOrg;
+                    lastDetailYn = queryResponse.getDetailYn();
                 }
-
+            } else {
+                lastColumns = queryResponse.getColumns();
             }
 
             queryResponse.setMessage("SUCCESS");
@@ -1017,26 +1013,6 @@ public class QueryService {
         String queryPrompt = promptMakerService.getChartPrompt(prompt, chartType, columns, data);
 
         try {
-            // // AI에 요청
-            // List<Message> messages = new ArrayList<>();
-            // if (systemPromptStr != null) {
-            //     messages.add(new SystemMessage(systemPromptStr));
-            // }
-            // if (prompt != null) {
-            //     messages.add(new UserMessage(prompt));
-            // }
-
-            // Prompt aiPrompt = new Prompt(messages);
-            // ChatResponse chatResponse;
-            
-            // if ("openai".equalsIgnoreCase(aiType) && openAiApiKey != null && !openAiApiKey.isEmpty()) {
-            //     chatResponse = openAiChatModel.call(aiPrompt);
-            // } else {
-            //     chatResponse = chatModel.call(aiPrompt);
-            // }
-
-            // String aiResponse = chatResponse.getResult().getOutput().getText();
-
             String aiResponse;
             if ("openai".equalsIgnoreCase(aiType)) {
                 aiResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(queryPrompt) : sendChatToOpenAI(conversationId, queryPrompt);

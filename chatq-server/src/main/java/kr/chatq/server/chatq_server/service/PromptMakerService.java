@@ -48,6 +48,7 @@ public class PromptMakerService {
             List<Map<String, Object>> columns = dbService.getColumns(tableName, level);
             //문자열을 담을 배열 변수 columnList 선언
             List<String> columnList = new ArrayList<>();
+            List<String> columnNmList = new ArrayList<>();
             List<String> headerColumnList = new ArrayList<>();
             
             for( int i = 0; i < columns.size(); i++ ) {
@@ -67,6 +68,7 @@ public class PromptMakerService {
 
                 columnList.add(columnBuilder.toString());
 
+                columnNmList.add(columnName);
                 if( headerColumnYn.equals("Y") ) {
                     headerColumnList.add(columnName);
                 }
@@ -78,6 +80,7 @@ public class PromptMakerService {
             queryBuilder.append(" from ").append(tableName).append(" ").append(tailQuery);
             infos.put(tableAlias, queryBuilder.toString());
             table.put("headerColumns", headerColumnList);
+            table.put("columnNmList", columnNmList);
         }   
         promptBuilder.append("}\\n 이 json 내용을 참고하여 [[").append(message).append("]]  문의에 가장 가까운 정보종류를 ")
             .append(String.join(", ", tableAliasList)).append(" 중에서 어느 것인지 한 개만 골라줘.");
