@@ -462,10 +462,10 @@ const App = () => {
                 ))}
               </select>
             </div>
-            {selectedInfo && selectedInfo !== '' && (
+            {selectedInfo && selectedInfo !== '' ? (
               <>
                 <h2 className="text-slate-400 text-sm font-semibold mb-3">
-                  {selectedInfo} {language === 'ko' ? '컬럼 정보' : 'Column Info'}
+                  {selectedInfo} {translations[language].columnInfo}
                 </h2>
                 {infoColumns && infoColumns[selectedInfo] ? (
                   <div className="space-y-1">
@@ -480,10 +480,16 @@ const App = () => {
                   </div>
                 ) : (
                   <div className="text-slate-500 text-xs">
-                    {language === 'ko' ? '컴럼 정보가 없습니다' : 'No column info available'}
+                    {translations[language].noColumnInfo}
                   </div>
                 )}
               </>
+            ) : (
+              <div className="mt-4 p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  {translations[language].selectSearchTargetHint}
+                </p>
+              </div>
             )}
           </div>
         </aside>
