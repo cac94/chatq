@@ -9,6 +9,7 @@ public class QueryRequest {
     private String lastQuery;
     private String tableQuery;
     private String tableName;
+    private String tableAlias;
     private List<String> headerColumns;
     private List<String> lastColumns;
 
@@ -58,6 +59,14 @@ public class QueryRequest {
 
     public void setTableName(String tableName) {
         this.tableName = tableName;
+    }
+
+    public String getTableAlias() {
+        return tableAlias;
+    }
+
+    public void setTableAlias(String tableAlias) {
+        this.tableAlias = tableAlias;
     }
 
     public List<String> getHeaderColumns() {

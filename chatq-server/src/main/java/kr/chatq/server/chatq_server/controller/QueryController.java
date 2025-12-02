@@ -70,6 +70,7 @@ public class QueryController {
                 request.getLastQuery(), 
                 request.getTableQuery(), 
                 request.getTableName(), 
+                request.getTableAlias(),
                 request.getHeaderColumns(),
                 request.getLastColumns()
             );
@@ -95,7 +96,7 @@ public class QueryController {
             LoginResponse response = queryService.processLogin(request.getUser(), request.getPassword());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            LoginResponse response = new LoginResponse("FAIL", null, null, 9, null, null, null);
+            LoginResponse response = new LoginResponse("FAIL", null, null, 9, null, null, null, null);
             return ResponseEntity.ok(response);
         }
     }

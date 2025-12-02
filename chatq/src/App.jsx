@@ -10,6 +10,7 @@ import AuthManagement from './components/AuthManagement'
 import InfoManagement from './components/InfoManagement'
 import ChartPromptModal from './components/ChartPromptModal'
 import ChartResultModal from './components/ChartResultModal'
+import ConfirmModal from './components/ConfirmModal'
 import chatqLogo from './assets/chatqicon51x51.png'
 import translations from './translation'
 
@@ -34,6 +35,7 @@ const App = () => {
   const [auth, setAuth] = useState('GUEST')
   const [user, setUser] = useState(null)
   const [infos, setInfos] = useState(null)
+  const [infoColumns, setInfoColumns] = useState(null)
   const [level, setLevel] = useState(9)
   const [userNm, setUserNm] = useState(null)
   const [showChartModal, setShowChartModal] = useState(false)
@@ -41,6 +43,9 @@ const App = () => {
   const [chartResult, setChartResult] = useState(null)
   const [activeGridForChart, setActiveGridForChart] = useState(null)
   const [activeChartType, setActiveChartType] = useState('bar')
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmCallback, setConfirmCallback] = useState(null)
+  const [confirmMessage, setConfirmMessage] = useState('')
   const bottomRef = useRef(null)
   const inputContainerRef = useRef(null)
   const qurl = '/api/chatq' // Your API endpoint
@@ -50,11 +55,13 @@ const App = () => {
   const [tableQuery, setTableQuery] = useState(null)
   const [lastDetailYn, setLastDetailYn] = useState(null)
   const [tableName, setTableName] = useState(null)
+  const [tableAlias, setTableAlias] = useState(null)
   const [headerColumns, setHeaderColumns] = useState(null)
   const [lastColumns, setLastColumns] = useState(null)
   // ChatQ session history: each session stores its first query
   const [sessions, setSessions] = useState([]) // { id, firstQuery, startedAt }
   const [currentSessionId, setCurrentSessionId] = useState(null)
+  const [selectedInfo, setSelectedInfo] = useState('')
 
   const handleResetSession = () => {
     setGrids([])
@@ -62,6 +69,7 @@ const App = () => {
     setTableQuery(null)
     setLastDetailYn(null)
     setTableName(null)
+    setTableAlias(null)
     setHeaderColumns(null)
     setLastColumns(null)
     // Start a new ChatQ session
@@ -99,10 +107,12 @@ const App = () => {
       // 응답 데이터 저장
       setAuth(response.data.auth)
       setInfos(response.data.infos)
+      setInfoColumns(response.data.infoColumns)
       setLevel(response.data.level)
       setUserNm(response.data.user_nm)
       // 사용자 아이디 저장 (우선 서버 응답, 없으면 입력값 사용)
       setUser(response.data.user || username)
+      setSelectedInfo('')
 
       setShowLoginModal(false)
       // 비밀번호 초기화 상태면 안내 메시지와 함께 사용자정보 모달 오픈
@@ -122,9 +132,27 @@ const App = () => {
     }
   }
 
-  const handleSend = async (overridePrompt = null, sessionIdForFirstQuery = null, ignoreContext = false) => {
+  const handleSend = async (overridePrompt = null, sessionIdForFirstQuery = null, ignoreContext = false, overrideTableAlias = null) => {
     const effectivePrompt = overridePrompt !== null ? overridePrompt : query
+    
     if (effectivePrompt.trim()) {
+      // Check if search target has changed - only when user manually selected different target
+      if (!ignoreContext && selectedInfo && selectedInfo !== '' && tableAlias && selectedInfo !== tableAlias) {
+        // Use setTimeout to ensure state updates are processed
+        const tempTableAlias = String(selectedInfo) // Capture current selectedInfo value
+        setTimeout(() => {
+          setConfirmMessage(translations[language].searchTargetChanged)
+          const callback = () => {
+            const newId = handleResetSession()
+            setTableAlias(tempTableAlias)
+            handleSend(effectivePrompt, newId, true, tempTableAlias)
+          }
+          setConfirmCallback(() => callback)
+          setShowConfirmModal(true)
+        }, 0)
+        return
+      }
+
       setIsLoading(true)
       try {
         const postData = {
@@ -135,8 +163,11 @@ const App = () => {
           if (tableQuery) postData.tableQuery = tableQuery
           if (lastDetailYn) postData.lastDetailYn = lastDetailYn
           if (tableName) postData.tableName = tableName
+          postData.tableAlias = overrideTableAlias || selectedInfo || tableAlias
           if (headerColumns) postData.headerColumns = headerColumns
           if (lastColumns) postData.lastColumns = lastColumns
+        }else {
+          postData.tableAlias = overrideTableAlias || selectedInfo
         }
 
         const response = await axios.post(qurl, postData)
@@ -176,6 +207,10 @@ const App = () => {
         setTableQuery(response.data.tableQuery || null)
         setLastDetailYn(response.data.lastDetailYn || null)
         setTableName(response.data.tableName || null)
+        setTableAlias(response.data.tableAlias || null)
+        if (response.data.tableAlias) {
+          setSelectedInfo(response.data.tableAlias)
+        }
         if (response.data.headerColumns && response.data.headerColumns.length > 0) {
           setHeaderColumns(response.data.headerColumns)
         }
@@ -251,6 +286,7 @@ const App = () => {
           // Restore user state from session
           setAuth(response.data.auth || 'GUEST')
           setInfos(response.data.infos || null)
+          setInfoColumns(response.data.infoColumns || null)
           setLevel(response.data.level || 9)
           setUserNm(response.data.user_nm || null)
           setUser(response.data.user)
@@ -280,9 +316,9 @@ const App = () => {
   }, [showAlert, openUserInfoAfterAlert])
 
   return (
-    <div className="min-h-screen w-full bg-slate-900">
+    <div className="flex flex-col h-screen bg-slate-900">
       {/* Fixed header with input */}
-      <div className="sticky top-0 bg-slate-900 p-4 shadow-lg z-50" ref={inputContainerRef}>
+      <div className="sticky top-0 bg-gradient-to-b from-slate-900 to-slate-900/95 p-4 shadow-xl backdrop-blur-sm z-50" ref={inputContainerRef}>
         {/* Header actions (float right) */}
         <div className="absolute top-4 right-4 flex items-center gap-2 z-[60]">
           <button
@@ -346,14 +382,12 @@ const App = () => {
           </button>
         </div>
         {/* Align header content with main content (reserve sidebar width) */}
-        <div className="flex">
-          <div className="hidden md:block w-64" />
-          <div className="flex-1 pr-2">
-            <h1
-              className="text-4xl font-bold text-white mb-6 text-center flex items-center justify-center gap-3 cursor-pointer select-none hover:opacity-90"
+        <div className="flex items-center">
+          <div className="hidden md:flex md:items-center md:w-64 md:pl-4">
+            <div
+              className="flex items-center gap-3 cursor-pointer select-none hover:opacity-90"
               role="button"
               tabIndex={0}
-
               title={translations[language].newChatQ}
               onClick={handleResetSession}
               onKeyDown={(e) => {
@@ -362,9 +396,11 @@ const App = () => {
                 }
               }}
             >
-              <img src={chatqLogo} alt="ChatQ Logo" className="h-8 w-8" />
-              ChatQ
-            </h1>
+              <img src={chatqLogo} alt="ChatQ Logo" className="h-10 w-10" />
+              <span className="text-2xl font-bold text-white">ChatQ</span>
+            </div>
+          </div>
+          <div className="flex-1 pr-2">
             <div className="relative">
               <img src={chatqLogo} alt="ChatQ" className="absolute left-3 top-1/2 -translate-y-1/2 h-6 w-6" />
               <input
@@ -402,47 +438,59 @@ const App = () => {
               </button>
             </div>
           </div>
+          <div className="hidden lg:block lg:w-64" />
         </div>
       </div>
 
       {/* Layout with left sidebar for first query history */}
-      <div className="flex">
-        {/* Sidebar */}
-        {/* Sticky sidebar so history stays visible while scrolling */}
-        <aside className="hidden md:block w-64 p-4 border-r border-slate-800 bg-slate-900/80 sticky top-24 h-[calc(100vh-6rem)] overflow-y-auto" style={{ paddingTop: '50px' }}>
-          <h2 className="text-slate-400 text-sm font-semibold mb-3">{translations[language].myChatQTopics}</h2>
-          <ul className="space-y-2 pr-1">
-            {sessions.filter(s => s.firstQuery).length === 0 && (
-              <li className="text-slate-500 text-xs">{translations[language].noHistory}</li>
-            )}
-            {sessions
-              .filter(s => s.firstQuery)
-              .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
-              .map(s => (
-                <li key={s.id} className="group relative">
-                  <button
-                    type="button"
-                    onClick={() => handleReplay(s.firstQuery)}
-                    className="w-full text-left text-xs text-slate-300 hover:bg-slate-800/60 rounded px-1 py-1"
-                    title={`${translations[language].replay}: ${s.firstQuery}`}
-                  >
-                    <span
-                      className="block w-full px-2 py-1 rounded bg-slate-800/70 group-hover:bg-slate-700/70 transition-colors overflow-hidden whitespace-nowrap text-ellipsis"
-                    >
-                      {s.firstQuery}
-                    </span>
-                  </button>
-                  {/* Hover full content tooltip */}
-                  <div className="pointer-events-none absolute left-0 top-full mt-1 z-10 hidden group-hover:block bg-slate-800 text-slate-200 text-xs p-2 rounded shadow-lg max-w-xs whitespace-pre-wrap break-words">
-                    {s.firstQuery}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left sidebar - Search target and columns */}
+        <aside className="hidden lg:block w-64 bg-slate-950 overflow-y-auto flex-shrink-0">
+          <div className="p-4">
+            <div className="mb-4">
+              <label className="text-slate-400 text-sm font-semibold block mb-2">{translations[language].searchTarget}</label>
+              <select
+                value={selectedInfo}
+                onChange={(e) => {
+                  setSelectedInfo(e.target.value)
+                }}
+                className="w-full px-3 py-2.5 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 focus:outline-none focus:border-slate-500 text-sm"
+              >
+                <option value="">{translations[language].searchTargetAll}</option>
+                {infos && infos.map((info) => (
+                  <option key={info} value={info}>{info}</option>
+                ))}
+              </select>
+            </div>
+            {selectedInfo && selectedInfo !== '' && (
+              <>
+                <h2 className="text-slate-400 text-sm font-semibold mb-3">
+                  {selectedInfo} {language === 'ko' ? '컬럼 정보' : 'Column Info'}
+                </h2>
+                {infoColumns && infoColumns[selectedInfo] ? (
+                  <div className="space-y-1">
+                    {infoColumns[selectedInfo].map((column, index) => (
+                      <div
+                        key={index}
+                        className="text-xs text-slate-300 bg-slate-800/50 px-3 py-2 rounded hover:bg-slate-800 transition-colors"
+                      >
+                        {column}
+                      </div>
+                    ))}
                   </div>
-                </li>
-              ))}
-          </ul>
+                ) : (
+                  <div className="text-slate-500 text-xs">
+                    {language === 'ko' ? '컴럼 정보가 없습니다' : 'No column info available'}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </aside>
         {/* Main content */}
-        <div className="flex-1 p-4 min-w-0">
-          <div className="space-y-6 mt-4">
+        <div className="flex-1 overflow-y-auto bg-slate-900">
+          <div className="p-4">
+            <div className="space-y-6 mt-4">
             {grids.length === 0 && (
               <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="text-center text-slate-500 max-w-2xl">
@@ -476,7 +524,7 @@ const App = () => {
                       <button
                         onClick={() => toggleShowDetail(grid.id)}
                         className={`p-1 hover:bg-slate-700 rounded-md transition-colors ${grid.showDetail ? 'text-blue-500' : 'text-slate-400 hover:text-slate-300'}`}
-                        title={grid.showDetail ? "Show Original Data" : "Show Detail Data"}
+                        title={grid.showDetail ? translations[language].showHeaderData : translations[language].showDetailData}
                       >
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -538,8 +586,43 @@ const App = () => {
               </div>
             ))}
             <div ref={bottomRef} />
+            </div>
           </div>
         </div>
+        {/* Right sidebar - ChatQ topics */}
+        <aside className="hidden md:block w-64 bg-slate-950 overflow-y-auto flex-shrink-0">
+          <div className="p-4">
+            <h2 className="text-slate-400 text-sm font-semibold mb-3">{translations[language].myChatQTopics}</h2>
+            <ul className="space-y-2 pr-1">
+              {sessions.filter(s => s.firstQuery).length === 0 && (
+                <li className="text-slate-500 text-xs">{translations[language].noHistory}</li>
+              )}
+              {sessions
+                .filter(s => s.firstQuery)
+                .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
+                .map(s => (
+                  <li key={s.id} className="group relative">
+                    <button
+                      type="button"
+                      onClick={() => handleReplay(s.firstQuery)}
+                      className="w-full text-left text-xs text-slate-300 hover:bg-slate-800/60 rounded px-1 py-1"
+                      title={`${translations[language].replay}: ${s.firstQuery}`}
+                    >
+                      <span
+                        className="block w-full px-2 py-1 rounded bg-slate-800/70 group-hover:bg-slate-700/70 transition-colors overflow-hidden whitespace-nowrap text-ellipsis"
+                      >
+                        {s.firstQuery}
+                      </span>
+                    </button>
+                    {/* Hover full content tooltip */}
+                    <div className="pointer-events-none absolute left-0 top-full mt-1 z-10 hidden group-hover:block bg-slate-800 text-slate-200 text-xs p-2 rounded shadow-lg max-w-xs whitespace-pre-wrap break-words">
+                      {s.firstQuery}
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        </aside>
         {/* Close flex layout */}
       </div>
 
@@ -599,6 +682,7 @@ const App = () => {
             setAuth(null)
             setUser(null)
             setInfos(null)
+            setInfoColumns(null)
             setLevel(null)
             setUserNm(null)
             setGrids([])
@@ -606,10 +690,12 @@ const App = () => {
             setTableQuery(null)
             setLastDetailYn(null)
             setTableName(null)
+            setTableAlias(null)
             setHeaderColumns(null)
             setLastColumns(null)
             setSessions([])
             setCurrentSessionId(null)
+            setSelectedInfo('')
             setShowUserInfoModal(false)
             setAlertMessage(translations[language].logoutSuccess)
             setShowAlert(true)
@@ -654,6 +740,27 @@ const App = () => {
         onClose={() => setShowChartResultModal(false)}
         chartData={chartResult}
         chartType={activeChartType}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        onClose={() => {
+          setShowConfirmModal(false)
+          setConfirmMessage('')
+          setConfirmCallback(null)
+        }}
+        onConfirm={() => {
+          if (confirmCallback && typeof confirmCallback === 'function') {
+            confirmCallback()
+          }
+          setShowConfirmModal(false)
+          setConfirmMessage('')
+          setConfirmCallback(null)
+        }}
+        message={confirmMessage}
+        language={language}
+        translations={translations}
       />
     </div >
   )

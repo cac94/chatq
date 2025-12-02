@@ -1,6 +1,7 @@
 package kr.chatq.server.chatq_server.dto;
 
 import java.util.List;
+import java.util.Map;
 
 public class LoginResponse {
     private String message;
@@ -10,11 +11,12 @@ public class LoginResponse {
     private String user;      // 사용자 아이디
     private String user_nm;   // 사용자 이름
     private String pwdFiredYn;
+    private Map<String, List<String>> infoColumns;
 
     public LoginResponse() {
     }
 
-    public LoginResponse(String message, String auth, List<String> infos, int level, String user, String user_nm, String pwdFiredYn) {
+    public LoginResponse(String message, String auth, List<String> infos, int level, String user, String user_nm, String pwdFiredYn, Map<String, List<String>> infoColumns) {
         this.message = message;
         this.auth = auth;
         this.infos = infos;
@@ -22,6 +24,7 @@ public class LoginResponse {
         this.user = user;
         this.user_nm = user_nm;
         this.pwdFiredYn = pwdFiredYn;
+        this.infoColumns = infoColumns;
     }
     public String getUser() {
         return user;
@@ -77,5 +80,13 @@ public class LoginResponse {
 
     public void setPwdFiredYn(String pwdFiredYn) {
         this.pwdFiredYn = pwdFiredYn;
+    }
+
+    public Map<String, List<String>> getInfoColumns() {
+        return infoColumns;
+    }
+
+    public void setInfoColumns(Map<String, List<String>> infoColumns) {
+        this.infoColumns = infoColumns;
     }
 }

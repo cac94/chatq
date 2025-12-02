@@ -16,6 +16,7 @@ public class QueryResponse {
     private String lastQuery;
     private String tableQuery;
     private String tableName;
+    private String tableAlias;
     private String lastDetailYn;
 
     public String getTableName() {
@@ -24,6 +25,14 @@ public class QueryResponse {
 
     public void setTableName(String tableName) {
         this.tableName = tableName;
+    }
+
+    public String getTableAlias() {
+        return tableAlias;
+    }
+
+    public void setTableAlias(String tableAlias) {
+        this.tableAlias = tableAlias;
     }
 
     public List<String> getColumns() {

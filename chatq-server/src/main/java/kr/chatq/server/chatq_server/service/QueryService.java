@@ -218,7 +218,7 @@ public class QueryService {
     }
 
     @SuppressWarnings("unchecked")
-    public QueryResponse executeChatQuery(String conversationId, String message, String lastDetailYn, String lastQuery, String tableQuery, String tableName, List<String> headerColumns, List<String> lastColumns) throws SQLException {
+    public QueryResponse executeChatQuery(String conversationId, String message, String lastDetailYn, String lastQuery, String tableQuery, String tableName, String tableAlias, List<String> headerColumns, List<String> lastColumns) throws SQLException {
         String ollamaResponse;
         String baseQuery;
         String detailYn = lastDetailYn;
@@ -238,18 +238,20 @@ public class QueryService {
             String prompt = (String) result.get("prompt");
             Map<String, String> infos = (Map<String, String>) result.get("infos");
 
-            if ("openai".equalsIgnoreCase(aiType)) {
-                ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(prompt) : sendChatToOpenAI(conversationId, prompt);
-            } else {    
-                ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(prompt) : sendChatToOllama(conversationId, prompt);
+            if(tableAlias == null || tableAlias.isEmpty()) {
+                if ("openai".equalsIgnoreCase(aiType)) {
+                    ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(prompt) : sendChatToOpenAI(conversationId, prompt);
+                } else {    
+                    ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(prompt) : sendChatToOllama(conversationId, prompt);
+                }
+
+                //logging ollamaResponse
+                System.out.println(aiType + " Response: " + ollamaResponse);
+                logger.info("{} Response: {}", aiType, ollamaResponse);
+
+                // 선택된 테이블의 alias 추출 후 기본 쿼리 가져오기
+                tableAlias = extractBetweenDoubleUnderscores(ollamaResponse);
             }
-
-            //logging ollamaResponse
-            System.out.println(aiType + " Response: " + ollamaResponse);
-            logger.info("{} Response: {}", aiType, ollamaResponse);
-
-            // 선택된 테이블의 alias 추출 후 기본 쿼리 가져오기
-            String tableAlias = extractBetweenDoubleUnderscores(ollamaResponse);
             baseQuery = infos.get(tableAlias);
 
             List<Map<String, Object>> tables = (List<Map<String, Object>>) result.get("tables");
@@ -316,6 +318,7 @@ public class QueryService {
             queryResponse.setLastQuery(encrypt(lastQuery));
             queryResponse.setTableQuery(encrypt(tableQuery));
             queryResponse.setTableName(tableName);
+            queryResponse.setTableAlias(tableAlias);
             queryResponse.setLastDetailYn(lastDetailYn);
             queryResponse.setLastColumns(lastColumns);
 
@@ -642,14 +645,14 @@ public class QueryService {
         // 1) 사용자 기본 정보 + 암호화된 비밀번호 조회
         List<Map<String, Object>> rows = dbService.getUsers(user);
         if (rows.isEmpty()) {
-            return new LoginResponse("FAIL", null, null, 9, null, null, null);
+            return new LoginResponse("FAIL", null, null, 9, null, null, null, null);
         }
 
         Map<String, Object> userInfo = rows.get(0);
         String hashedPassword = (String) userInfo.get("password");
         if (!user.equals("admin") && (hashedPassword == null || !matchesPwd(password, hashedPassword))) {
             // 비밀번호 불일치
-            return new LoginResponse("FAIL", null, null, 9, null, null, null);
+            return new LoginResponse("FAIL", null, null, 9, null, null, null, null);
         }
 
         String auth = (String) userInfo.get("auth");
@@ -660,9 +663,18 @@ public class QueryService {
         // 2) 권한별 접근 가능한 정보(테이블) 목록 조회
         List<Map<String, Object>> authTables = dbService.getAuthTables(auth);
         List<String> infos = new ArrayList<>();
+        Map<String, List<String>> infoColumns = new HashMap<>();
         for (Map<String, Object> table : authTables) {
+            String tableName = (String) table.get("table_nm");
             String tableAlias = (String) table.get("table_alias");
             infos.add(tableAlias);
+            List<Map<String, Object>> columns = dbService.getColumns(tableName, level);
+            //columns 에서 column_nm 값만 추출하여 infoColumns에 저장
+            List<String> columnNmList = new ArrayList<>();  
+            for (Map<String, Object> column : columns) {
+                columnNmList.add((String) column.get("column_nm"));
+            }
+            infoColumns.put(tableAlias, columnNmList);
         }
 
         // 3) 세션 저장
@@ -673,7 +685,9 @@ public class QueryService {
         session.setAttribute("AUTH", auth);
         session.setAttribute("LEVEL", level);
         session.setAttribute("INFOS", infos);
+        session.setAttribute("INFO_COLUMNS", infoColumns);
 
+        // 4) 로그인 성공 응답 반환
         return new LoginResponse(
             "SUCCESS",
             auth,
@@ -681,7 +695,8 @@ public class QueryService {
             level,
             user,
             userName,
-            pwdFiredYn
+            pwdFiredYn,
+            infoColumns
         );
     }
 
@@ -696,6 +711,8 @@ public class QueryService {
             session.removeAttribute("USER_NM");
             session.removeAttribute("AUTH");
             session.removeAttribute("LEVEL");
+            session.removeAttribute("INFOS");
+            session.removeAttribute("INFO_COLUMNS");
         }
     }
 
@@ -983,16 +1000,18 @@ public class QueryService {
      */
     public LoginResponse checkSession(HttpSession session) {
         if (session == null) {
-            return new LoginResponse("FAIL", null, null, 9, null, null, null);
+            return new LoginResponse("FAIL", null, null, 9, null, null, null, null);
         }
         String user = (String) session.getAttribute("USER");
         String auth = (String) session.getAttribute("AUTH");
         @SuppressWarnings("unchecked")
         List<String> infos = (List<String>) session.getAttribute("INFOS");
+        @SuppressWarnings("unchecked")
+        Map<String, List<String>> infoColumns = (Map<String, List<String>>) session.getAttribute("INFO_COLUMNS");
         Integer level = (Integer) session.getAttribute("LEVEL");
         String userName = (String) session.getAttribute("USER_NM");
         if (level == null) level = 9;
-        return new LoginResponse("SUCCESS", auth, infos, level, user, userName, null);
+        return new LoginResponse("SUCCESS", auth, infos, level, user, userName, null, infoColumns);
     }
 
     /**
