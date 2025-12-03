@@ -58,8 +58,8 @@ const App = () => {
   const [tableAlias, setTableAlias] = useState(null)
   const [headerColumns, setHeaderColumns] = useState(null)
   const [lastColumns, setLastColumns] = useState(null)
-  // ChatQ session history: each session stores its first query
-  const [sessions, setSessions] = useState([]) // { id, firstQuery, startedAt }
+  // ChatQ session history: each session stores its first query and tableAlias
+  const [sessions, setSessions] = useState([]) // { id, firstQuery, tableAlias, startedAt }
   const [currentSessionId, setCurrentSessionId] = useState(null)
   const [selectedInfo, setSelectedInfo] = useState('')
 
@@ -74,7 +74,7 @@ const App = () => {
     setLastColumns(null)
     // Start a new ChatQ session
     const newId = Date.now()
-    setSessions(prev => [...prev, { id: newId, firstQuery: null, startedAt: new Date() }])
+    setSessions(prev => [...prev, { id: newId, firstQuery: null, tableAlias: null, startedAt: new Date() }])
     setCurrentSessionId(newId)
     return newId
   }
@@ -134,7 +134,7 @@ const App = () => {
 
   const handleSend = async (overridePrompt = null, sessionIdForFirstQuery = null, ignoreContext = false, overrideTableAlias = null) => {
     const effectivePrompt = overridePrompt !== null ? overridePrompt : query
-    
+
     if (effectivePrompt.trim()) {
       // Check if search target has changed - only when user manually selected different target
       if (!ignoreContext && selectedInfo && selectedInfo !== '' && tableAlias && selectedInfo !== tableAlias) {
@@ -166,7 +166,7 @@ const App = () => {
           postData.tableAlias = overrideTableAlias || selectedInfo || tableAlias
           if (headerColumns) postData.headerColumns = headerColumns
           if (lastColumns) postData.lastColumns = lastColumns
-        }else {
+        } else {
           postData.tableAlias = overrideTableAlias || selectedInfo
         }
 
@@ -194,11 +194,11 @@ const App = () => {
           showDetail: false
         }])
 
-        // Set firstQuery for session if absent (supports replay where session id provided directly)
+        // Set firstQuery and tableAlias for session if absent (supports replay where session id provided directly)
         const targetSessionId = sessionIdForFirstQuery !== null ? sessionIdForFirstQuery : currentSessionId
         setSessions(prev => prev.map(s => {
           if (s.id === targetSessionId && !s.firstQuery) {
-            return { ...s, firstQuery: effectivePrompt }
+            return { ...s, firstQuery: effectivePrompt, tableAlias: response.data.tableAlias || null }
           }
           return s
         }))
@@ -229,12 +229,16 @@ const App = () => {
   }
 
   // Replay a previous session's first query by starting a new session and auto-running it
-  const handleReplay = (firstQuery) => {
-    if (!firstQuery) return
+  const handleReplay = (session) => {
+    if (!session || !session.firstQuery) return
     // Reset conversation state
     const newId = handleResetSession()
-    setQuery(firstQuery)
-    handleSend(firstQuery, newId, true)
+    setQuery(session.firstQuery)
+    // Restore the saved tableAlias (search target)
+    if (session.tableAlias) {
+      setSelectedInfo(session.tableAlias)
+    }
+    handleSend(session.firstQuery, newId, true, session.tableAlias)
   }
 
   const handleChartPromptSubmit = async (prompt, chartType) => {
@@ -302,7 +306,7 @@ const App = () => {
   useEffect(() => {
     if (sessions.length === 0) {
       const newId = Date.now()
-      setSessions([{ id: newId, firstQuery: null, startedAt: new Date() }])
+      setSessions([{ id: newId, firstQuery: null, tableAlias: null, startedAt: new Date() }])
       setCurrentSessionId(newId)
     }
   }, [sessions.length])
@@ -497,50 +501,50 @@ const App = () => {
         <div className="flex-1 overflow-y-auto bg-slate-900">
           <div className="p-4">
             <div className="space-y-6 mt-4">
-            {grids.length === 0 && (
-              <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="text-center text-slate-500 max-w-2xl">
-                  <div className="font-semibold text-lg mb-3">{translations[language].tipsTitle}</div>
-                  <div className="text-sm mb-4 text-left">{translations[language].tipsSubtitle}</div>
-                  <ul className="list-disc text-left inline-block space-y-1.5">
-                    {translations[language].tips.map((tip, index) => (
-                      <li key={index}>{tip}</li>
-                    ))}
-                  </ul>
+              {grids.length === 0 && (
+                <div className="flex items-center justify-center min-h-[60vh]">
+                  <div className="text-center text-slate-500 max-w-2xl">
+                    <div className="font-semibold text-lg mb-3">{translations[language].tipsTitle}</div>
+                    <div className="text-sm mb-4 text-left">{translations[language].tipsSubtitle}</div>
+                    <ul className="list-disc text-left inline-block space-y-1.5">
+                      {translations[language].tips.map((tip, index) => (
+                        <li key={index}>{tip}</li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-              </div>
-            )}
-            {grids.map(grid => (
-              <div key={grid.id} className="bg-slate-800 p-4 rounded-lg">
-                <div className="text-slate-300 mb-4 font-medium flex items-center justify-between">
-                  <span>Query: {grid.query}</span>
-                  <div className="flex items-center gap-0">
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(grid.query)
-                      }}
-                      className="p-1 hover:bg-slate-700 rounded-md transition-colors text-slate-400 hover:text-slate-300"
-                      title={translations[language].copyQuery}
-                    >
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    </button>
-                    {grid.detailYn === 'Y' && (
+              )}
+              {grids.map(grid => (
+                <div key={grid.id} className="bg-slate-800 p-4 rounded-lg">
+                  <div className="text-slate-300 mb-4 font-medium flex items-center justify-between">
+                    <span>Query: {grid.query}</span>
+                    <div className="flex items-center gap-0">
                       <button
-                        onClick={() => toggleShowDetail(grid.id)}
-                        className={`p-1 hover:bg-slate-700 rounded-md transition-colors ${grid.showDetail ? 'text-blue-500' : 'text-slate-400 hover:text-slate-300'}`}
-                        title={grid.showDetail ? translations[language].showHeaderData : translations[language].showDetailData}
+                        onClick={() => {
+                          navigator.clipboard.writeText(grid.query)
+                        }}
+                        className="p-1 hover:bg-slate-700 rounded-md transition-colors text-slate-400 hover:text-slate-300"
+                        title={translations[language].copyQuery}
                       >
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>
                       </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        // Generate HTML table for Excel compatibility
-                        const html = `
+                      {grid.detailYn === 'Y' && (
+                        <button
+                          onClick={() => toggleShowDetail(grid.id)}
+                          className={`p-1 hover:bg-slate-700 rounded-md transition-colors ${grid.showDetail ? 'text-blue-500' : 'text-slate-400 hover:text-slate-300'}`}
+                          title={grid.showDetail ? translations[language].showHeaderData : translations[language].showDetailData}
+                        >
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          // Generate HTML table for Excel compatibility
+                          const html = `
                             <html>
                               <head><meta charset="UTF-8"></head>
                               <body>
@@ -554,44 +558,44 @@ const App = () => {
                                 </table>
                               </body>
                             </html>`;
-                        const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-                        const link = document.createElement('a');
-                        link.href = URL.createObjectURL(blob);
-                        link.download = `chatq_${grid.id}.xls`;
-                        link.click();
-                      }}
-                      className="p-1 hover:bg-slate-700 rounded-md transition-colors text-green-500 hover:text-green-400"
-                      title={translations[language].downloadExcel}
-                    >
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setActiveGridForChart(grid.id)
-                        setShowChartModal(true)
-                      }}
-                      className="p-1 hover:bg-slate-700 rounded-md transition-colors text-purple-500 hover:text-purple-400"
-                      title={translations[language].generateChart || "Generate Chart"}
-                    >
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                    </button>
+                          const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+                          const link = document.createElement('a');
+                          link.href = URL.createObjectURL(blob);
+                          link.download = `chatq_${grid.id}.xls`;
+                          link.click();
+                        }}
+                        className="p-1 hover:bg-slate-700 rounded-md transition-colors text-green-500 hover:text-green-400"
+                        title={translations[language].downloadExcel}
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActiveGridForChart(grid.id)
+                          setShowChartModal(true)
+                        }}
+                        className="p-1 hover:bg-slate-700 rounded-md transition-colors text-purple-500 hover:text-purple-400"
+                        title={translations[language].generateChart || "Generate Chart"}
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
+                  <DataGrid
+                    data={grid.data}
+                    columns={grid.columns}
+                    headerData={grid.headerData}
+                    headerColumns={grid.headerColumns}
+                    detailYn={grid.detailYn}
+                    showDetail={grid.showDetail}
+                  />
                 </div>
-                <DataGrid
-                  data={grid.data}
-                  columns={grid.columns}
-                  headerData={grid.headerData}
-                  headerColumns={grid.headerColumns}
-                  detailYn={grid.detailYn}
-                  showDetail={grid.showDetail}
-                />
-              </div>
-            ))}
-            <div ref={bottomRef} />
+              ))}
+              <div ref={bottomRef} />
             </div>
           </div>
         </div>
@@ -610,19 +614,19 @@ const App = () => {
                   <li key={s.id} className="group relative">
                     <button
                       type="button"
-                      onClick={() => handleReplay(s.firstQuery)}
+                      onClick={() => handleReplay(s)}
                       className="w-full text-left text-xs text-slate-300 hover:bg-slate-800/60 rounded px-1 py-1"
                       title={`${translations[language].replay}: ${s.firstQuery}`}
                     >
                       <span
                         className="block w-full px-2 py-1 rounded bg-slate-800/70 group-hover:bg-slate-700/70 transition-colors overflow-hidden whitespace-nowrap text-ellipsis"
                       >
-                        {s.firstQuery}
+                        {s.tableAlias ? `[${s.tableAlias}] ${s.firstQuery}` : s.firstQuery}
                       </span>
                     </button>
                     {/* Hover full content tooltip */}
                     <div className="pointer-events-none absolute left-0 top-full mt-1 z-10 hidden group-hover:block bg-slate-800 text-slate-200 text-xs p-2 rounded shadow-lg max-w-xs whitespace-pre-wrap break-words">
-                      {s.firstQuery}
+                      {s.tableAlias ? `[${s.tableAlias}] ${s.firstQuery}` : s.firstQuery}
                     </div>
                   </li>
                 ))}
