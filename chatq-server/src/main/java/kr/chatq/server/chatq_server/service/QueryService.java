@@ -4,6 +4,7 @@ import kr.chatq.server.chatq_server.dto.LoginResponse;
 import kr.chatq.server.chatq_server.dto.QueryResponse;
 import kr.chatq.server.chatq_server.dto.UserDto;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,8 @@ import java.util.regex.Pattern;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.sql.DataSource;
+
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 @Service
@@ -52,11 +55,12 @@ public class QueryService {
     private static final Logger logger = LoggerFactory.getLogger(PromptMakerService.class);
     private final OllamaChatModel chatModel;
     private final OpenAiChatModel openAiChatModel;
- 
+
     // 대화 메모리를 저장할 Map (conversationId -> 메시지 리스트)
     private final Map<String, List<Message>> conversationMemory = new HashMap<>();
 
-    // application.properties 의 spring.ai.ollama.chat.options.model 값을 aimodel 변수로 선언
+    // application.properties 의 spring.ai.ollama.chat.options.model 값을 aimodel 변수로
+    // 선언
     @Value("${spring.ai.ollama.chat.options.model}")
     private String aimodel;
 
@@ -121,7 +125,12 @@ public class QueryService {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private javax.sql.DataSource dataSource;
+    @Qualifier("secondaryJdbcTemplate")
+    private JdbcTemplate secondaryJdbcTemplate;
+
+    @Autowired
+    @Qualifier("secondaryDataSource")
+    private DataSource secondaryDataSource;
 
     // Spring이 ChatModel (Ollama 또는 기본 ChatModel) 빈을 찾아서 주입
     public QueryService(OllamaChatModel chatModel, OpenAiChatModel openAiChatModel) {
@@ -133,37 +142,37 @@ public class QueryService {
         if (sql == null) {
             throw new IllegalArgumentException("SQL query cannot be null");
         }
-        
+
         // Apply pre_query and post_query
         String finalSql = sql;
         if (preQuery != null && !preQuery.isEmpty()) {
             finalSql = preQuery + finalSql;
         }
         if (postQuery != null && !postQuery.isEmpty()) {
-            //finalSql 의 마지막에 ";" 제거
+            // finalSql 의 마지막에 ";" 제거
             if (finalSql.trim().endsWith(";")) {
                 finalSql = finalSql.trim();
                 finalSql = finalSql.substring(0, finalSql.length() - 1);
             }
             finalSql = finalSql + postQuery;
         }
-        
-        //logging sql
+
+        // logging sql
         System.out.println("Executing SQL: " + finalSql);
         logger.info("Executing SQL: {}", finalSql);
 
         QueryResponse response = new QueryResponse();
-        return jdbcTemplate.query(finalSql, (ResultSet rs) -> {
+        return secondaryJdbcTemplate.query(finalSql, (ResultSet rs) -> {
             ResultSetMetaData metaData = rs.getMetaData();
             int columnCount = metaData.getColumnCount();
-            
+
             // Get column names
             List<String> columns = new ArrayList<>();
             for (int i = 1; i <= columnCount; i++) {
                 columns.add(metaData.getColumnLabel(i));
             }
             response.setColumns(columns);
-            
+
             // Get data
             List<Map<String, Object>> data = new ArrayList<>();
             while (rs.next()) {
@@ -174,7 +183,8 @@ public class QueryService {
                 data.add(row);
             }
             response.setData(data);
-            if("Y".equalsIgnoreCase(detailYn) && headerColumnList != null && !headerColumnList.isEmpty() && columns.containsAll(headerColumnList) ) {
+            if ("Y".equalsIgnoreCase(detailYn) && headerColumnList != null && !headerColumnList.isEmpty()
+                    && columns.containsAll(headerColumnList)) {
                 // 헤더용 컬럼만 추출
                 List<Map<String, Object>> headerData = new ArrayList<>();
                 for (Map<String, Object> row : data) {
@@ -187,28 +197,30 @@ public class QueryService {
                     headerData.add(headerRow);
                 }
                 // 헤더 데이터 중복데이터는 제거하되 원래 순서 유지
-                Set<Map<String, Object>> uniqueHeaderData = new LinkedHashSet<>(headerData);  
+                Set<Map<String, Object>> uniqueHeaderData = new LinkedHashSet<>(headerData);
                 response.setHeaderData(new ArrayList<>(uniqueHeaderData));
                 response.setHeaderColumns(headerColumnList);
                 response.setDetailYn("Y");
-            }else{
+            } else {
                 response.setDetailYn("N");
             }
             return response;
         });
     }
-    
-    public QueryResponse executeChat(String conversationId,String message) {
+
+    public QueryResponse executeChat(String conversationId, String message) {
         String ollamaResponse;
         if (message == null) {
             throw new IllegalArgumentException("message cannot be null");
         }
 
-        //aiType에 따라 OpenAI 또는 Ollama로 분기
+        // aiType에 따라 OpenAI 또는 Ollama로 분기
         if ("openai".equalsIgnoreCase(aiType)) {
-            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(message) : sendChatToOpenAI(conversationId, message);
+            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(message)
+                    : sendChatToOpenAI(conversationId, message);
         } else {
-            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(message) : sendChatToOllama(conversationId, message);
+            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(message)
+                    : sendChatToOllama(conversationId, message);
         }
 
         QueryResponse response = new QueryResponse();
@@ -218,7 +230,9 @@ public class QueryService {
     }
 
     @SuppressWarnings("unchecked")
-    public QueryResponse executeChatQuery(String conversationId, String message, String lastDetailYn, String lastQuery, String tableQuery, String tableName, String tableAlias, List<String> headerColumns, List<String> lastColumns) throws SQLException {
+    public QueryResponse executeChatQuery(String conversationId, String message, String lastDetailYn, String lastQuery,
+            String tableQuery, String tableName, String tableAlias, List<String> headerColumns,
+            List<String> lastColumns) throws SQLException {
         String ollamaResponse;
         String baseQuery;
         String detailYn = lastDetailYn;
@@ -227,25 +241,28 @@ public class QueryService {
         }
 
         // 문의에 맞는 테이블을 고르는 프롬프트 생성
-        PromptMakerService promptMakerService = new PromptMakerService(new DbService(jdbcTemplate), dataSource);
-        
-        if( lastQuery != null && !lastQuery.isEmpty() ) { // 이전 쿼리가 있으면 복호화
+        PromptMakerService promptMakerService = new PromptMakerService(new DbService(jdbcTemplate),
+                secondaryDataSource);
+
+        if (lastQuery != null && !lastQuery.isEmpty()) { // 이전 쿼리가 있으면 복호화
             tableQuery = decrypt(tableQuery);
             baseQuery = decrypt(lastQuery);
             lastQuery = baseQuery;
-        }else{ // 이전 쿼리가 없으면 테이블 선택 프롬프트 실행
+        } else { // 이전 쿼리가 없으면 테이블 선택 프롬프트 실행
             Map<String, Object> result = promptMakerService.getPickTablePrompt(getAuth(), message, getLevel());
             String prompt = (String) result.get("prompt");
             Map<String, String> infos = (Map<String, String>) result.get("infos");
 
-            if(tableAlias == null || tableAlias.isEmpty()) {
+            if (tableAlias == null || tableAlias.isEmpty()) {
                 if ("openai".equalsIgnoreCase(aiType)) {
-                    ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(prompt) : sendChatToOpenAI(conversationId, prompt);
-                } else {    
-                    ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(prompt) : sendChatToOllama(conversationId, prompt);
+                    ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(prompt)
+                            : sendChatToOpenAI(conversationId, prompt);
+                } else {
+                    ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(prompt)
+                            : sendChatToOllama(conversationId, prompt);
                 }
 
-                //logging ollamaResponse
+                // logging ollamaResponse
                 System.out.println(aiType + " Response: " + ollamaResponse);
                 logger.info("{} Response: {}", aiType, ollamaResponse);
 
@@ -267,7 +284,7 @@ public class QueryService {
             tableName = selectedTable != null ? (String) selectedTable.get("table_nm") : null;
             detailYn = selectedTable != null ? (String) selectedTable.get("detail_yn") : null;
             headerColumns = selectedTable != null ? (List<String>) selectedTable.get("headerColumns") : null;
-            //기본값으로 last variables 갱신
+            // 기본값으로 last variables 갱신
             lastQuery = baseQuery;
             lastDetailYn = detailYn;
             lastColumns = selectedTable != null ? (List<String>) selectedTable.get("columnNmList") : null;
@@ -278,27 +295,29 @@ public class QueryService {
         String queryPrompt = (String) queryPromptResult.get("prompt");
 
         if ("openai".equalsIgnoreCase(aiType)) {
-            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(queryPrompt) : sendChatToOpenAI(conversationId, queryPrompt);
+            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(queryPrompt)
+                    : sendChatToOpenAI(conversationId, queryPrompt);
         } else {
-            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(queryPrompt) : sendChatToOllama(conversationId, queryPrompt);
+            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(queryPrompt)
+                    : sendChatToOllama(conversationId, queryPrompt);
         }
 
-        //logging ollamaResponse
+        // logging ollamaResponse
         System.out.println(aiType + " Response: " + ollamaResponse);
         logger.info("{} Response: {}", aiType, ollamaResponse);
 
         // SQL문 추출
         String sql = extractSqlFromMarkdown(ollamaResponse);
-        if((sql == null || sql.isEmpty()) && ollamaResponse.toUpperCase().indexOf("SELECT") >= 0) {
+        if ((sql == null || sql.isEmpty()) && ollamaResponse.toUpperCase().indexOf("SELECT") >= 0) {
             // 여러 개의 SQL 추출 시도
             sql = extractSelectStatement(ollamaResponse);
         }
 
         if (sql != null && !sql.isEmpty()) {
             sql = sanitizeResponse(sql);
-            //sql을 암호화해서 String lastQuery에 저장
+            // sql을 암호화해서 String lastQuery에 저장
             String sqlOrg = sql;
-            if(tableQuery != null && !tableQuery.isEmpty()) {
+            if (tableQuery != null && !tableQuery.isEmpty()) {
                 sql = sql.replace(tableName, tableQuery);
             }
 
@@ -330,37 +349,38 @@ public class QueryService {
 
         return response;
     }
-    
+
     public QueryResponse executeNewChat() {
         String auth = getAuth();
         String conversationId = auth + "_" + System.currentTimeMillis();
-        
+
         QueryResponse response = new QueryResponse();
         response.setMessage("New chat session started: " + conversationId);
         response.setConversationId(conversationId);
 
         return response;
     }
-    
+
     // 새 채팅을 시작하는 함수
     public String newChat() {
         String auth = getAuth();
         String conversationId = auth + "_" + System.currentTimeMillis();
-        
+
         // 새로운 대화 세션을 위한 고유 ID 생성
         return conversationId;
     }
-    //  @Bean
+    // @Bean
     // public ChatModel chatModel() {
-    //     // OllamaChatModel 빌더로 생성
-    //     return OllamaChatModel.builder()
-    //             .baseUrl("http://localhost:11434")
-    //             .model("deepseek-coder:6.7b")
-    //             .build();
-    // }   
-    
+    // // OllamaChatModel 빌더로 생성
+    // return OllamaChatModel.builder()
+    // .baseUrl("http://localhost:11434")
+    // .model("deepseek-coder:6.7b")
+    // .build();
+    // }
+
     public String extractBetweenDoubleUnderscores(String text) {
-        if (text == null) return null;
+        if (text == null)
+            return null;
         Matcher m = Pattern.compile("__([^_]+?)__").matcher(text);
         // 첫 번째 매칭만
         if (m.find()) {
@@ -368,9 +388,10 @@ public class QueryService {
         }
         return null;
     }
-    
+
     public String extractSqlFromMarkdown(String text) {
-        if (text == null) return null;
+        if (text == null)
+            return null;
         // ```sql ... ``` 패턴 매칭 (DOTALL 모드: 줄바꿈 포함)
         Matcher m = Pattern.compile("```sql\\s*([\\s\\S]*?)```", Pattern.CASE_INSENSITIVE).matcher(text);
         if (m.find()) {
@@ -378,9 +399,10 @@ public class QueryService {
         }
         return null;
     }
-    
+
     public String extractSelectStatement(String text) {
-        if (text == null) return null;
+        if (text == null)
+            return null;
         // SELECT ... ; 패턴 매칭 (대소문자 구분 없음, 줄바꿈 포함)
         Matcher m = Pattern.compile("(select[\\s\\S]*?;)", Pattern.CASE_INSENSITIVE).matcher(text);
         if (m.find()) {
@@ -394,113 +416,113 @@ public class QueryService {
         }
         return null;
     }
-    
+
     private String sanitizeResponse(String text) {
-        if (text == null) return null;
+        if (text == null)
+            return null;
         // 특수 토큰 및 바로 앞 단어 제거 (공백 포함)
         return text
-            .replaceAll("\\S+\\s*<[\\|｜]begin[▁_]of[▁_]sentence[\\|｜]>", "")
-            .replaceAll("\\S+\\s*<[\\|｜]end[▁_]of[▁_]sentence[\\|｜]>", "")
-            .replaceAll("\\S+\\s*<\\|begin_of_sentence\\|>", "")
-            .replaceAll("\\S+\\s*<\\|end_of_sentence\\|>", "")
-            .trim();
+                .replaceAll("\\S+\\s*<[\\|｜]begin[▁_]of[▁_]sentence[\\|｜]>", "")
+                .replaceAll("\\S+\\s*<[\\|｜]end[▁_]of[▁_]sentence[\\|｜]>", "")
+                .replaceAll("\\S+\\s*<\\|begin_of_sentence\\|>", "")
+                .replaceAll("\\S+\\s*<\\|end_of_sentence\\|>", "")
+                .trim();
     }
-    
+
     // private 메소드: Ollama에 문자열 보내고 결과 받기
     @SuppressWarnings("null")
     private String sendChatToOllama(String message) {
         ChatResponse response;
         OllamaOptions options = OllamaOptions.builder()
-            .model(aimodel)
-            .temperature(temperature)
-            .numPredict(numPredict)
-            .numCtx(numCtx)
-            .topK(topK)
-            .topP(topP)
-            .build();
+                .model(aimodel)
+                .temperature(temperature)
+                .numPredict(numPredict)
+                .numCtx(numCtx)
+                .topK(topK)
+                .topP(topP)
+                .build();
 
-        if("gpt-oss:20b".equals(aimodel)) {
+        if ("gpt-oss:20b".equals(aimodel)) {
             response = chatModel.call(
-                new Prompt(
-                    List.of(
-                        // new SystemMessage("""
-                        //     Use reasoning effort = "high".
-                        //     Perform multi-step chain-of-thought internally.
-                        // """),
-                        new SystemMessage("""
-                            {
-                                "settings": {
-                                    "reasoning_effort": "low"
-                                }
-                            }
-                        """),
-                        new UserMessage(message)
-                    )
-                )
-            );
-        }else {
+                    new Prompt(
+                            List.of(
+                                    // new SystemMessage("""
+                                    // Use reasoning effort = "high".
+                                    // Perform multi-step chain-of-thought internally.
+                                    // """),
+                                    new SystemMessage("""
+                                                {
+                                                    "settings": {
+                                                        "reasoning_effort": "low"
+                                                    }
+                                                }
+                                            """),
+                                    new UserMessage(message))));
+        } else {
             response = chatModel.call(new Prompt(message, options));
         }
 
         String rawText = response.getResult().getOutput().getText();
-        
-        return sanitizeResponse(rawText);
-   }
 
-   // private 메소드: OpenAI에 문자열 보내고 결과 받기
+        return sanitizeResponse(rawText);
+    }
+
+    // private 메소드: OpenAI에 문자열 보내고 결과 받기
     private String sendChatToOpenAI(String message) {
         if (openAiApiKey == null || openAiApiKey.isEmpty()) {
-            throw new IllegalStateException("OpenAI API key is not configured. Set spring.ai.openai.api-key in application.properties");
+            throw new IllegalStateException(
+                    "OpenAI API key is not configured. Set spring.ai.openai.api-key in application.properties");
         }
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
-            .temperature(1.0)
-            .build();
+                .temperature(1.0)
+                .build();
 
         ChatModel model = (openAiChatModel != null) ? openAiChatModel : chatModel;
         ChatResponse response = model.call(new Prompt(message, options));
         String rawText = response.getResult().getOutput().getText();
-        
+
         return sanitizeResponse(rawText);
     }
 
     // private 메소드: OpenAI에 문자열 보내고 결과 받기 (conversationId를 사용한 메모리 기능 포함)
     private String sendChatToOpenAI(String conversationId, String message) {
         if (openAiApiKey == null || openAiApiKey.isEmpty()) {
-            throw new IllegalStateException("OpenAI API key is not configured. Set spring.ai.openai.api-key in application.properties");
+            throw new IllegalStateException(
+                    "OpenAI API key is not configured. Set spring.ai.openai.api-key in application.properties");
         }
-        
+
         if (message == null) {
             throw new IllegalArgumentException("message cannot be null");
         }
-        
+
         // 이전 대화 내역 가져오기
         List<Message> messages = conversationMemory.getOrDefault(conversationId, new ArrayList<>());
         messages = new ArrayList<>(messages); // 새 리스트 생성 (원본 보호)
-        
+
         // 현재 사용자 메시지 추가
         UserMessage userMessage = new UserMessage(message);
         messages.add(userMessage);
-        
-       OpenAiChatOptions options = OpenAiChatOptions.builder()
-            .temperature(1.0)
-            .build();
+
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+                .temperature(1.0)
+                .build();
 
         // 메시지 히스토리와 함께 Prompt 생성
         ChatModel model = (openAiChatModel != null) ? openAiChatModel : chatModel;
         ChatResponse response = model.call(new Prompt(messages, options));
-        
+
         // AI 응답을 메시지 리스트에 추가
         messages.add(response.getResult().getOutput());
-        
+
         // 업데이트된 대화 내역을 메모리에 저장
         conversationMemory.put(conversationId, messages);
         String rawText = response.getResult().getOutput().getText();
-        
+
         return sanitizeResponse(rawText);
     }
 
-   // private 메소드: Ollama에 문자열 보내고 결과 받기 (conversationId를 사용한 메모리 기능 포함)
+    // private 메소드: Ollama에 문자열 보내고 결과 받기 (conversationId를 사용한 메모리 기능 포함)
     private String sendChatToOllama(String conversationId, String message) {
         if (message == null) {
             throw new IllegalArgumentException("message cannot be null");
@@ -508,38 +530,38 @@ public class QueryService {
         // 이전 대화 내역 가져오기
         List<Message> messages = conversationMemory.getOrDefault(conversationId, new ArrayList<>());
         messages = new ArrayList<>(messages); // 새 리스트 생성 (원본 보호)
-        
+
         // 현재 사용자 메시지 추가
         UserMessage userMessage = new UserMessage(message);
         messages.add(userMessage);
-        
+
         OllamaOptions options = OllamaOptions.builder()
-            .model(aimodel)
-            .temperature(temperature)
-            .numPredict(numPredict)
-            .numCtx(numCtx)
-            .topK(topK)
-            .topP(topP)
-            .build();
+                .model(aimodel)
+                .temperature(temperature)
+                .numPredict(numPredict)
+                .numCtx(numCtx)
+                .topK(topK)
+                .topP(topP)
+                .build();
 
         // 메시지 히스토리와 함께 Prompt 생성
         ChatResponse response = chatModel.call(new Prompt(messages, options));
-        
+
         // AI 응답을 메시지 리스트에 추가
         messages.add(response.getResult().getOutput());
-        
+
         // 업데이트된 대화 내역을 메모리에 저장
         conversationMemory.put(conversationId, messages);
         String rawText = response.getResult().getOutput().getText();
-        
+
         return sanitizeResponse(rawText);
-   }
+    }
 
     // private 메소드: session에서 AUTH 값이 있으면 가져오고 없으면 GUEST 반환
     private String getAuth() {
         ServletRequestAttributes attr = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
         HttpSession session = attr.getRequest().getSession(false);
-        
+
         if (session != null) {
             Object auth = session.getAttribute("AUTH");
             if (auth != null) {
@@ -553,7 +575,7 @@ public class QueryService {
     private String getUser() {
         ServletRequestAttributes attr = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
         HttpSession session = attr.getRequest().getSession(false);
-        
+
         if (session != null) {
             Object user = session.getAttribute("USER");
             if (user != null) {
@@ -567,7 +589,7 @@ public class QueryService {
     private int getLevel() {
         ServletRequestAttributes attr = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
         HttpSession session = attr.getRequest().getSession(false);
-        
+
         if (session != null) {
             Object level = session.getAttribute("LEVEL");
             if (level != null) {
@@ -583,7 +605,8 @@ public class QueryService {
 
     // AES-GCM encryption (reversible)
     private String encrypt(String plainText) {
-        if (plainText == null) return null;
+        if (plainText == null)
+            return null;
         try {
             byte[] keyBytes = Arrays.copyOf(encryptSecret.getBytes(StandardCharsets.UTF_8), 32); // 256-bit
             SecretKeySpec key = new SecretKeySpec(keyBytes, "AES");
@@ -611,10 +634,12 @@ public class QueryService {
     // AES-GCM decryption helper (for future use)
     @SuppressWarnings("unused")
     private String decrypt(String encBase64) {
-        if (encBase64 == null) return null;
+        if (encBase64 == null)
+            return null;
         try {
             byte[] combined = Base64.getDecoder().decode(encBase64);
-            if (combined.length < IV_LENGTH + 1) return null;
+            if (combined.length < IV_LENGTH + 1)
+                return null;
 
             byte[] iv = Arrays.copyOfRange(combined, 0, IV_LENGTH);
             byte[] cipherText = Arrays.copyOfRange(combined, IV_LENGTH, combined.length);
@@ -636,7 +661,8 @@ public class QueryService {
 
     /**
      * 로그인 처리
-     * @param user 사용자 아이디
+     * 
+     * @param user     사용자 아이디
      * @param password 비밀번호
      * @return LoginResponse
      */
@@ -669,8 +695,8 @@ public class QueryService {
             String tableAlias = (String) table.get("table_alias");
             infos.add(tableAlias);
             List<Map<String, Object>> columns = dbService.getColumns(tableName, level);
-            //columns 에서 column_nm 값만 추출하여 infoColumns에 저장
-            List<String> columnNmList = new ArrayList<>();  
+            // columns 에서 column_nm 값만 추출하여 infoColumns에 저장
+            List<String> columnNmList = new ArrayList<>();
             for (Map<String, Object> column : columns) {
                 columnNmList.add((String) column.get("column_nm"));
             }
@@ -689,15 +715,14 @@ public class QueryService {
 
         // 4) 로그인 성공 응답 반환
         return new LoginResponse(
-            "SUCCESS",
-            auth,
-            infos,
-            level,
-            user,
-            userName,
-            pwdFiredYn,
-            infoColumns
-        );
+                "SUCCESS",
+                auth,
+                infos,
+                level,
+                user,
+                userName,
+                pwdFiredYn,
+                infoColumns);
     }
 
     /**
@@ -737,13 +762,12 @@ public class QueryService {
     public void createUser(UserDto user) {
         String encryptedPassword = encryptPwd(user.getPassword());
         String sql = "INSERT INTO chatquser (user, user_nm, password, auth, level) VALUES (?, ?, ?, ?, ?)";
-        jdbcTemplate.update(sql, 
-            user.getUser(), 
-            user.getUser_nm(), 
-            encryptedPassword, 
-            user.getAuth(), 
-            user.getLevel()
-        );
+        jdbcTemplate.update(sql,
+                user.getUser(),
+                user.getUser_nm(),
+                encryptedPassword,
+                user.getAuth(),
+                user.getLevel());
     }
 
     /**
@@ -753,21 +777,19 @@ public class QueryService {
         if (user.getPassword() != null && !user.getPassword().isEmpty()) {
             String encryptedPassword = encryptPwd(user.getPassword());
             String sql = "UPDATE chatquser SET user_nm = ?, password = ?, auth = ?, level = ? WHERE user = ?";
-            jdbcTemplate.update(sql, 
-                user.getUser_nm(), 
-                encryptedPassword, 
-                user.getAuth(), 
-                user.getLevel(), 
-                userId
-            );
+            jdbcTemplate.update(sql,
+                    user.getUser_nm(),
+                    encryptedPassword,
+                    user.getAuth(),
+                    user.getLevel(),
+                    userId);
         } else {
             String sql = "UPDATE chatquser SET user_nm = ?, auth = ?, level = ? WHERE user = ?";
-            jdbcTemplate.update(sql, 
-                user.getUser_nm(), 
-                user.getAuth(), 
-                user.getLevel(), 
-                userId
-            );
+            jdbcTemplate.update(sql,
+                    user.getUser_nm(),
+                    user.getAuth(),
+                    user.getLevel(),
+                    userId);
         }
     }
 
@@ -791,9 +813,10 @@ public class QueryService {
 
     /**
      * 비밀번호 변경
-     * @param userId 사용자 아이디
+     * 
+     * @param userId          사용자 아이디
      * @param currentPassword 현재 비밀번호 (null 이면 검증 없이 변경)
-     * @param newPassword 새 비밀번호
+     * @param newPassword     새 비밀번호
      */
     public void changePassword(String userId, String currentPassword, String newPassword) {
         if (userId == null || userId.isEmpty()) {
@@ -823,8 +846,10 @@ public class QueryService {
         String sql = "UPDATE chatquser SET pwd_fired_yn = 'N', password = ? WHERE user = ?";
         jdbcTemplate.update(sql, newHashed, userId);
     }
+
     /**
-     * One-way password hashing using BCrypt. Each invocation generates a unique salt.
+     * One-way password hashing using BCrypt. Each invocation generates a unique
+     * salt.
      */
     public String encryptPwd(String rawPassword) {
         if (rawPassword == null) {
@@ -845,6 +870,7 @@ public class QueryService {
 
     /**
      * 모든 권한 옵션 조회
+     * 
      * @return 권한 목록
      */
     public List<Map<String, String>> getAuthOptions() {
@@ -859,19 +885,20 @@ public class QueryService {
 
     /**
      * 권한 목록 조회 (상세)
+     * 
      * @return 권한 목록
      */
     public List<kr.chatq.server.chatq_server.dto.AuthDto> getAuths() {
         String sql = "SELECT code as auth, text1 as auth_nm, " +
-                     "(SELECT GROUP_CONCAT(table_nm) \r\n" + //
-                        "FROM chatqauth\r\n" + //
-                        "WHERE auth = chatqcode.code) as infos, " +
-                     "(SELECT GROUP_CONCAT(tb.table_alias) \r\n" + //
-                        "FROM chatqauth au\r\n" + //
-                        "INNER JOIN chatqtable tb\r\n" + //
-                        "ON(au.table_nm = tb.table_nm)\r\n" + //
-                        "WHERE au.auth = chatqcode.code) as infonms " +
-                     "FROM chatqcode WHERE codetype = 'AUTH' ORDER BY sortorder";
+                "(SELECT GROUP_CONCAT(table_nm) \r\n" + //
+                "FROM chatqauth\r\n" + //
+                "WHERE auth = chatqcode.code) as infos, " +
+                "(SELECT GROUP_CONCAT(tb.table_alias) \r\n" + //
+                "FROM chatqauth au\r\n" + //
+                "INNER JOIN chatqtable tb\r\n" + //
+                "ON(au.table_nm = tb.table_nm)\r\n" + //
+                "WHERE au.auth = chatqcode.code) as infonms " +
+                "FROM chatqcode WHERE codetype = 'AUTH' ORDER BY sortorder";
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             kr.chatq.server.chatq_server.dto.AuthDto auth = new kr.chatq.server.chatq_server.dto.AuthDto();
             auth.setAuth(rs.getString("auth"));
@@ -884,6 +911,7 @@ public class QueryService {
 
     /**
      * 권한 생성
+     * 
      * @param auth 권한 정보
      */
     public void createAuth(kr.chatq.server.chatq_server.dto.AuthDto auth) {
@@ -903,8 +931,9 @@ public class QueryService {
 
     /**
      * 권한 수정
+     * 
      * @param authId 권한 코드
-     * @param auth 권한 정보
+     * @param auth   권한 정보
      */
     public void updateAuth(String authId, kr.chatq.server.chatq_server.dto.AuthDto auth) {
         // 1. chatqcode 테이블 업데이트
@@ -930,6 +959,7 @@ public class QueryService {
 
     /**
      * 권한 삭제
+     * 
      * @param authId 권한 코드
      */
     public void deleteAuth(String authId) {
@@ -944,6 +974,7 @@ public class QueryService {
 
     /**
      * 정보(테이블) 목록 조회
+     * 
      * @return 정보 목록
      */
     public List<Map<String, String>> getInfos() {
@@ -958,6 +989,7 @@ public class QueryService {
 
     /**
      * 테이블의 칼럼 목록 조회 (메타데이터 기반)
+     * 
      * @param tableNm 테이블명
      * @return 칼럼 목록 (column_cd, column_nm, level)
      */
@@ -977,24 +1009,26 @@ public class QueryService {
 
     /**
      * 테이블 칼럼 정보 수정 (현재 메타 저장소가 없어 NO-OP 로깅 처리)
+     * 
      * @param tableNm 테이블명
      * @param columns 수정할 칼럼 목록
      */
     public void updateInfoColumns(String tableNm, kr.chatq.server.chatq_server.dto.ColumnDto columnDto) {
-        if (tableNm == null || tableNm.isEmpty() || columnDto == null || columnDto.getColumn_cd() == null || columnDto.getColumn_cd().isEmpty()) {
+        if (tableNm == null || tableNm.isEmpty() || columnDto == null || columnDto.getColumn_cd() == null
+                || columnDto.getColumn_cd().isEmpty()) {
             return;
         }
         String sql = "UPDATE chatqcolumn SET level = ? WHERE table_nm = ? AND column_cd = ?";
         jdbcTemplate.update(sql,
-            columnDto.getLevel(),
-            tableNm,
-            columnDto.getColumn_cd()
-        );
+                columnDto.getLevel(),
+                tableNm,
+                columnDto.getColumn_cd());
     }
 
     /**
      * 현재 HTTP 세션에서 로그인 정보를 복원한다.
      * 컨트롤러 /api/check-session 엔드포인트에서 사용.
+     * 
      * @param session HttpSession
      * @return LoginResponse (SUCCESS 또는 FAIL)
      */
@@ -1010,17 +1044,20 @@ public class QueryService {
         Map<String, List<String>> infoColumns = (Map<String, List<String>>) session.getAttribute("INFO_COLUMNS");
         Integer level = (Integer) session.getAttribute("LEVEL");
         String userName = (String) session.getAttribute("USER_NM");
-        if (level == null) level = 9;
+        if (level == null)
+            level = 9;
         return new LoginResponse("SUCCESS", auth, infos, level, user, userName, null, infoColumns);
     }
 
     /**
      * 차트 생성을 위한 메서드
      * 사용자 프롬프트, 차트 타입, 데이터를 받아 AI가 분석하여 차트 데이터를 생성한다.
+     * 
      * @param request ChartRequest (prompt, chartType, columns, data)
      * @return ChartResponse (labels, datasets)
      */
-    public kr.chatq.server.chatq_server.dto.ChartResponse generateChart(kr.chatq.server.chatq_server.dto.ChartRequest request) {
+    public kr.chatq.server.chatq_server.dto.ChartResponse generateChart(
+            kr.chatq.server.chatq_server.dto.ChartRequest request) {
         String prompt = request.getPrompt();
         String chartType = request.getChartType();
         List<Map<String, String>> columns = request.getColumns();
@@ -1028,15 +1065,18 @@ public class QueryService {
         String conversationId = request.getConversationId();
 
         // PromptMakerService를 사용하여 차트 프롬프트 생성
-        PromptMakerService promptMakerService = new PromptMakerService(new DbService(jdbcTemplate), dataSource);
+        PromptMakerService promptMakerService = new PromptMakerService(new DbService(jdbcTemplate),
+                secondaryDataSource);
         String queryPrompt = promptMakerService.getChartPrompt(prompt, chartType, columns, data);
 
         try {
             String aiResponse;
             if ("openai".equalsIgnoreCase(aiType)) {
-                aiResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(queryPrompt) : sendChatToOpenAI(conversationId, queryPrompt);
+                aiResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(queryPrompt)
+                        : sendChatToOpenAI(conversationId, queryPrompt);
             } else {
-                aiResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(queryPrompt) : sendChatToOllama(conversationId, queryPrompt);
+                aiResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(queryPrompt)
+                        : sendChatToOllama(conversationId, queryPrompt);
             }
 
             logger.info("AI Chart Response: {}", aiResponse);
@@ -1078,7 +1118,7 @@ public class QueryService {
         try {
             json = json.trim();
             kr.chatq.server.chatq_server.dto.ChartResponse response = new kr.chatq.server.chatq_server.dto.ChartResponse();
-            
+
             // labels 추출
             List<String> labels = new ArrayList<>();
             Pattern labelsPattern = Pattern.compile("\"labels\"\\s*:\\s*\\[([^\\]]+)\\]");
@@ -1097,19 +1137,18 @@ public class QueryService {
             List<kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset> datasets = new ArrayList<>();
             Pattern datasetPattern = Pattern.compile("\\{[^}]*\"label\"[^}]*\\}");
             Matcher datasetMatcher = datasetPattern.matcher(json);
-            
+
             while (datasetMatcher.find()) {
                 String datasetJson = datasetMatcher.group();
-                kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset dataset = 
-                    new kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset();
-                
+                kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset dataset = new kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset();
+
                 // label 추출
                 Pattern labelPattern = Pattern.compile("\"label\"\\s*:\\s*\"([^\"]+)\"");
                 Matcher labelMatcher = labelPattern.matcher(datasetJson);
                 if (labelMatcher.find()) {
                     dataset.setLabel(labelMatcher.group(1));
                 }
-                
+
                 // data 추출
                 Pattern dataPattern = Pattern.compile("\"data\"\\s*:\\s*\\[([^\\]]+)\\]");
                 Matcher dataMatcher = dataPattern.matcher(datasetJson);
@@ -1131,7 +1170,7 @@ public class QueryService {
                     }
                     dataset.setData(dataList);
                 }
-                
+
                 // backgroundColor 추출
                 Pattern bgColorPattern = Pattern.compile("\"backgroundColor\"\\s*:\\s*\"([^\"]+)\"");
                 Matcher bgColorMatcher = bgColorPattern.matcher(datasetJson);
@@ -1140,7 +1179,7 @@ public class QueryService {
                 } else {
                     dataset.setBackgroundColor("rgba(53, 162, 235, 0.5)");
                 }
-                
+
                 // borderColor 추출
                 Pattern borderColorPattern = Pattern.compile("\"borderColor\"\\s*:\\s*\"([^\"]+)\"");
                 Matcher borderColorMatcher = borderColorPattern.matcher(datasetJson);
@@ -1149,7 +1188,7 @@ public class QueryService {
                 } else {
                     dataset.setBorderColor("rgb(53, 162, 235)");
                 }
-                
+
                 // borderWidth 추출
                 Pattern borderWidthPattern = Pattern.compile("\"borderWidth\"\\s*:\\s*(\\d+)");
                 Matcher borderWidthMatcher = borderWidthPattern.matcher(datasetJson);
@@ -1158,11 +1197,11 @@ public class QueryService {
                 } else {
                     dataset.setBorderWidth(1);
                 }
-                
+
                 datasets.add(dataset);
             }
             response.setDatasets(datasets);
-            
+
             return response;
         } catch (Exception e) {
             logger.error("JSON 파싱 오류", e);
@@ -1174,17 +1213,17 @@ public class QueryService {
      * 기본 차트 응답 생성 (AI 호출 실패 시 폴백)
      */
     private kr.chatq.server.chatq_server.dto.ChartResponse createDefaultChartResponse(
-            List<Map<String, Object>> data, 
+            List<Map<String, Object>> data,
             List<Map<String, String>> columns,
             String chartType) {
-        
+
         kr.chatq.server.chatq_server.dto.ChartResponse response = new kr.chatq.server.chatq_server.dto.ChartResponse();
-        
+
         // 라벨 생성 (첫 번째 컬럼 또는 인덱스)
         List<String> labels = new ArrayList<>();
         int sampleSize = Math.min(10, data.size());
         String labelKey = columns.isEmpty() ? null : columns.get(0).get("key");
-        
+
         for (int i = 0; i < sampleSize; i++) {
             if (labelKey != null && data.get(i).containsKey(labelKey)) {
                 labels.add(String.valueOf(data.get(i).get(labelKey)));
@@ -1193,13 +1232,13 @@ public class QueryService {
             }
         }
         response.setLabels(labels);
-        
+
         // 데이터셋 생성 (숫자 컬럼을 찾아서)
         List<kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset> datasets = new ArrayList<>();
         for (int colIdx = 1; colIdx < columns.size(); colIdx++) {
             String colKey = columns.get(colIdx).get("key");
             List<Number> dataValues = new ArrayList<>();
-            
+
             for (int i = 0; i < sampleSize; i++) {
                 Object value = data.get(i).get(colKey);
                 if (value instanceof Number) {
@@ -1212,19 +1251,17 @@ public class QueryService {
                     }
                 }
             }
-            
-            kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset dataset = 
-                new kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset(
+
+            kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset dataset = new kr.chatq.server.chatq_server.dto.ChartResponse.ChartDataset(
                     columns.get(colIdx).get("label"),
                     dataValues,
                     "rgba(53, 162, 235, 0.5)",
                     "rgb(53, 162, 235)",
-                    1
-                );
+                    1);
             datasets.add(dataset);
         }
         response.setDatasets(datasets);
-        
+
         return response;
     }
 }
