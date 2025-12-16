@@ -11,7 +11,7 @@
 	<groupId>kr.chatq.server</groupId>
 	<artifactId>chatq-server</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<packaging>war</packaging>
+	<packaging>jar</packaging>
 	<name>chatq-server</name>
 	<description>Chatting Query Project</description>
 	<url/>
@@ -59,11 +59,7 @@
 			<artifactId>mariadb-java-client</artifactId>
 			<scope>runtime</scope>
 		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-tomcat</artifactId>
-			<scope>provided</scope>
-		</dependency>
+		<!-- Tomcat is now embedded (removed provided scope for JAR packaging) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
