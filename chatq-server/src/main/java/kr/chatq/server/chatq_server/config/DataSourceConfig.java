@@ -47,7 +47,7 @@ public class DataSourceConfig {
     }
 
     /**
-     * Secondary DataSource - 보조 데이터소스 (chatcompany 테이블에서 조회)
+     * Secondary DataSource - 보조 데이터소스 (chatqcomp 테이블에서 조회)
      */
     @Bean(name = "secondaryDataSource")
     @DependsOn({ "primaryDataSource", "jdbcTemplate" })

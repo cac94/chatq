@@ -62,7 +62,7 @@ public class DynamicDataSource extends AbstractDataSource {
         try {
             // Check DB for config
             Map<String, Object> config = primaryJdbcTemplate.queryForMap(
-                    "SELECT jdbc_url, username, password, driver_class_name FROM chatcompany WHERE company = ?",
+                    "SELECT jdbc_url, username, password, driver_class_name FROM chatqcomp WHERE company = ?",
                     company);
 
             jdbcUrl = (String) config.get("jdbc_url");
@@ -70,11 +70,11 @@ public class DynamicDataSource extends AbstractDataSource {
             password = (String) config.get("password");
             driverClassName = (String) config.get("driver_class_name");
 
-            logger.info("Loaded DataSource config from chatcompany table for '{}'", company);
+            logger.info("Loaded DataSource config from chatqcomp table for '{}'", company);
         } catch (Exception e) {
             // Failed to find or error
             logger.warn(
-                    "No configuration found in chatcompany table for '{}' or error occurred. Using default fallback.",
+                    "No configuration found in chatqcomp table for '{}' or error occurred. Using default fallback.",
                     company);
             if (!"chatq".equals(company)) {
                 // If not chatq and failed, maybe we should return defaultDataSource?
