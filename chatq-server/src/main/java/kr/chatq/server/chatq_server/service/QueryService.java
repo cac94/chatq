@@ -23,6 +23,8 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import kr.chatq.server.chatq_server.config.CompanyContext;
+
 import jakarta.servlet.http.HttpSession;
 
 import java.sql.ResultSet;
@@ -744,8 +746,12 @@ public class QueryService {
     /**
      * 모든 사용자 조회
      */
+    /**
+     * 모든 사용자 조회
+     */
     public List<UserDto> getUsers() {
-        String sql = "SELECT user, user_nm, auth, level FROM chatquser ORDER BY user";
+        String company = CompanyContext.getCompany();
+        String sql = "SELECT user, user_nm, auth, level FROM chatquser WHERE company = ? ORDER BY user";
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             UserDto user = new UserDto();
             user.setUser(rs.getString("user"));
@@ -753,42 +759,47 @@ public class QueryService {
             user.setAuth(rs.getString("auth"));
             user.setLevel(rs.getInt("level"));
             return user;
-        });
+        }, company);
     }
 
     /**
      * 사용자 생성
      */
     public void createUser(UserDto user) {
+        String company = CompanyContext.getCompany();
         String encryptedPassword = encryptPwd(user.getPassword());
-        String sql = "INSERT INTO chatquser (user, user_nm, password, auth, level) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO chatquser (user, user_nm, password, auth, level, company) VALUES (?, ?, ?, ?, ?, ?)";
         jdbcTemplate.update(sql,
                 user.getUser(),
                 user.getUser_nm(),
                 encryptedPassword,
                 user.getAuth(),
-                user.getLevel());
+                user.getLevel(),
+                company);
     }
 
     /**
      * 사용자 수정
      */
     public void updateUser(String userId, UserDto user) {
+        String company = CompanyContext.getCompany();
         if (user.getPassword() != null && !user.getPassword().isEmpty()) {
             String encryptedPassword = encryptPwd(user.getPassword());
-            String sql = "UPDATE chatquser SET user_nm = ?, password = ?, auth = ?, level = ? WHERE user = ?";
+            String sql = "UPDATE chatquser SET user_nm = ?, password = ?, auth = ?, level = ? WHERE company = ? AND user = ?";
             jdbcTemplate.update(sql,
                     user.getUser_nm(),
                     encryptedPassword,
                     user.getAuth(),
                     user.getLevel(),
+                    company,
                     userId);
         } else {
-            String sql = "UPDATE chatquser SET user_nm = ?, auth = ?, level = ? WHERE user = ?";
+            String sql = "UPDATE chatquser SET user_nm = ?, auth = ?, level = ? WHERE company = ? AND user = ?";
             jdbcTemplate.update(sql,
                     user.getUser_nm(),
                     user.getAuth(),
                     user.getLevel(),
+                    company,
                     userId);
         }
     }
@@ -797,18 +808,20 @@ public class QueryService {
      * 사용자 삭제
      */
     public void deleteUser(String userId) {
-        String sql = "DELETE FROM chatquser WHERE user = ?";
-        jdbcTemplate.update(sql, userId);
+        String company = CompanyContext.getCompany();
+        String sql = "DELETE FROM chatquser WHERE company = ? AND user = ?";
+        jdbcTemplate.update(sql, company, userId);
     }
 
     /**
      * 비밀번호 초기화 (기본값으로 설정)
      */
     public void resetPassword(String userId) {
+        String company = CompanyContext.getCompany(); // context
         String defaultPassword = userId; // 기본 비밀번호
         String encryptedPassword = encryptPwd(defaultPassword);
-        String sql = "UPDATE chatquser SET pwd_fired_yn = 'Y', password = ? WHERE user = ?";
-        jdbcTemplate.update(sql, encryptedPassword, userId);
+        String sql = "UPDATE chatquser SET pwd_fired_yn = 'Y', password = ? WHERE company = ? AND user = ?";
+        jdbcTemplate.update(sql, encryptedPassword, company, userId);
     }
 
     /**
@@ -842,9 +855,10 @@ public class QueryService {
             }
         }
 
+        String company = CompanyContext.getCompany();
         String newHashed = encryptPwd(newPassword);
-        String sql = "UPDATE chatquser SET pwd_fired_yn = 'N', password = ? WHERE user = ?";
-        jdbcTemplate.update(sql, newHashed, userId);
+        String sql = "UPDATE chatquser SET pwd_fired_yn = 'N', password = ? WHERE company = ? AND user = ?";
+        jdbcTemplate.update(sql, newHashed, company, userId);
     }
 
     /**
@@ -874,13 +888,14 @@ public class QueryService {
      * @return 권한 목록
      */
     public List<Map<String, String>> getAuthOptions() {
-        String sql = "SELECT code as auth, text1 as auth_nm FROM chatqcode WHERE codetype = 'AUTH' ORDER BY sortorder";
+        String company = CompanyContext.getCompany();
+        String sql = "SELECT code as auth, text1 as auth_nm FROM chatqcode WHERE company = ? AND codetype = 'AUTH' ORDER BY sortorder";
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Map<String, String> map = new HashMap<>();
             map.put("auth", rs.getString("auth"));
             map.put("auth_nm", rs.getString("auth_nm"));
             return map;
-        });
+        }, company);
     }
 
     /**
@@ -889,16 +904,17 @@ public class QueryService {
      * @return 권한 목록
      */
     public List<kr.chatq.server.chatq_server.dto.AuthDto> getAuths() {
+        String company = CompanyContext.getCompany();
         String sql = "SELECT code as auth, text1 as auth_nm, " +
                 "(SELECT GROUP_CONCAT(table_nm) \r\n" + //
                 "FROM chatqauth\r\n" + //
-                "WHERE auth = chatqcode.code) as infos, " +
+                "WHERE company = chatqcode.company AND auth = chatqcode.code) as infos, " +
                 "(SELECT GROUP_CONCAT(tb.table_alias) \r\n" + //
                 "FROM chatqauth au\r\n" + //
                 "INNER JOIN chatqtable tb\r\n" + //
-                "ON(au.table_nm = tb.table_nm)\r\n" + //
-                "WHERE au.auth = chatqcode.code) as infonms " +
-                "FROM chatqcode WHERE codetype = 'AUTH' ORDER BY sortorder";
+                "ON(au.company = tb.company and au.table_nm = tb.table_nm)\r\n" + //
+                "WHERE au.company = chatqcode.company AND au.auth = chatqcode.code) as infonms " +
+                "FROM chatqcode WHERE company = ? AND codetype = 'AUTH' ORDER BY sortorder";
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             kr.chatq.server.chatq_server.dto.AuthDto auth = new kr.chatq.server.chatq_server.dto.AuthDto();
             auth.setAuth(rs.getString("auth"));
@@ -906,7 +922,7 @@ public class QueryService {
             auth.setInfos(rs.getString("infos"));
             auth.setInfonms(rs.getString("infonms"));
             return auth;
-        });
+        }, company);
     }
 
     /**
@@ -915,16 +931,17 @@ public class QueryService {
      * @param auth 권한 정보
      */
     public void createAuth(kr.chatq.server.chatq_server.dto.AuthDto auth) {
+        String company = CompanyContext.getCompany();
         // 1. chatqcode 테이블에 권한 추가
-        String codeSql = "INSERT INTO chatqcode (codetype, code, text1) VALUES ('AUTH', ?, ?)";
-        jdbcTemplate.update(codeSql, auth.getAuth(), auth.getAuth_nm());
+        String codeSql = "INSERT INTO chatqcode (codetype, code, text1, company) VALUES ('AUTH', ?, ?, ?)";
+        jdbcTemplate.update(codeSql, auth.getAuth(), auth.getAuth_nm(), company);
 
         // 2. infos가 있으면 chatqauth 테이블에 추가
         if (auth.getInfos() != null && !auth.getInfos().isEmpty()) {
             String[] infoArray = auth.getInfos().split(",");
-            String authSql = "INSERT INTO chatqauth (auth, table_nm) VALUES (?, ?)";
+            String authSql = "INSERT INTO chatqauth (auth, table_nm, company) VALUES (?, ?, ?)";
             for (String info : infoArray) {
-                jdbcTemplate.update(authSql, auth.getAuth(), info.trim());
+                jdbcTemplate.update(authSql, auth.getAuth(), info.trim(), company);
             }
         }
     }
@@ -936,23 +953,24 @@ public class QueryService {
      * @param auth   권한 정보
      */
     public void updateAuth(String authId, kr.chatq.server.chatq_server.dto.AuthDto auth) {
+        String company = CompanyContext.getCompany();
         // 1. chatqcode 테이블 업데이트
-        String codeSql = "UPDATE chatqcode SET text1 = ? WHERE code = ?";
-        jdbcTemplate.update(codeSql, auth.getAuth_nm(), authId);
+        String codeSql = "UPDATE chatqcode SET text1 = ? WHERE company = ? AND code = ?";
+        jdbcTemplate.update(codeSql, auth.getAuth_nm(), company, authId);
 
         // 2. chatqauth 테이블 기존 데이터 삭제 후 재생성
-        String deleteSql = "DELETE FROM chatqauth WHERE auth = ?";
-        jdbcTemplate.update(deleteSql, authId);
+        String deleteSql = "DELETE FROM chatqauth WHERE company = ? AND auth = ?";
+        jdbcTemplate.update(deleteSql, company, authId);
 
         if (auth.getInfos() != null && !auth.getInfos().isEmpty()) {
             String[] infoArray = auth.getInfos().split(",");
-            String authSql = "INSERT INTO chatqauth (auth, table_nm, add_date, add_time, add_user) VALUES (?, ?, ?, ?, ?)";
+            String authSql = "INSERT INTO chatqauth (auth, table_nm, add_date, add_time, add_user, company) VALUES (?, ?, ?, ?, ?, ?)";
             String currentUser = getUser();
             LocalDateTime now = LocalDateTime.now();
             String addDate = now.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             String addTime = now.format(DateTimeFormatter.ofPattern("HHmmss"));
             for (String info : infoArray) {
-                jdbcTemplate.update(authSql, authId, info.trim(), addDate, addTime, currentUser);
+                jdbcTemplate.update(authSql, authId, info.trim(), addDate, addTime, currentUser, company);
             }
         }
     }
@@ -963,13 +981,14 @@ public class QueryService {
      * @param authId 권한 코드
      */
     public void deleteAuth(String authId) {
+        String company = CompanyContext.getCompany();
         // 1. chatqauth 테이블에서 삭제
-        String authSql = "DELETE FROM chatqauth WHERE auth = ?";
-        jdbcTemplate.update(authSql, authId);
+        String authSql = "DELETE FROM chatqauth WHERE company = ? AND auth = ?";
+        jdbcTemplate.update(authSql, company, authId);
 
         // 2. chatqcode 테이블에서 삭제
-        String codeSql = "DELETE FROM chatqcode WHERE code = ?";
-        jdbcTemplate.update(codeSql, authId);
+        String codeSql = "DELETE FROM chatqcode WHERE company = ? AND code = ?";
+        jdbcTemplate.update(codeSql, company, authId);
     }
 
     /**
@@ -978,13 +997,14 @@ public class QueryService {
      * @return 정보 목록
      */
     public List<Map<String, String>> getInfos() {
-        String sql = "SELECT table_nm, table_alias FROM chatqtable ORDER BY table_nm";
+        String company = CompanyContext.getCompany();
+        String sql = "SELECT table_nm, table_alias FROM chatqtable WHERE company = ? ORDER BY table_nm";
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Map<String, String> map = new HashMap<>();
             map.put("table_nm", rs.getString("table_nm"));
             map.put("table_alias", rs.getString("table_alias"));
             return map;
-        });
+        }, company);
     }
 
     /**
@@ -997,14 +1017,15 @@ public class QueryService {
         if (tableNm == null || tableNm.isEmpty()) {
             return List.of();
         }
-        String sql = "SELECT column_cd, column_nm, level FROM chatqcolumn WHERE table_nm = ? ORDER BY column_order";
+        String company = CompanyContext.getCompany();
+        String sql = "SELECT column_cd, column_nm, level FROM chatqcolumn WHERE company = ? AND table_nm = ? ORDER BY column_order";
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             kr.chatq.server.chatq_server.dto.ColumnDto dto = new kr.chatq.server.chatq_server.dto.ColumnDto();
             dto.setColumn_cd(rs.getString("column_cd"));
             dto.setColumn_nm(rs.getString("column_nm"));
             dto.setLevel(rs.getInt("level"));
             return dto;
-        }, tableNm);
+        }, company, tableNm);
     }
 
     /**
@@ -1018,9 +1039,11 @@ public class QueryService {
                 || columnDto.getColumn_cd().isEmpty()) {
             return;
         }
-        String sql = "UPDATE chatqcolumn SET level = ? WHERE table_nm = ? AND column_cd = ?";
+        String company = CompanyContext.getCompany();
+        String sql = "UPDATE chatqcolumn SET level = ? WHERE company = ? AND table_nm = ? AND column_cd = ?";
         jdbcTemplate.update(sql,
                 columnDto.getLevel(),
+                company,
                 tableNm,
                 columnDto.getColumn_cd());
     }

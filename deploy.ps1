@@ -4,7 +4,8 @@
 param(
     [switch]$SkipFrontend,  # Skip frontend build
     [switch]$SkipBackend,   # Skip backend build
-    [switch]$RunServer      # Run server after build
+    [switch]$RunServer,     # Run server after build
+    [switch]$DebugMode      # Enable Java Debug Wire Protocol (port 5005)
 )
 
 # UTF-8 Encoding Settings
@@ -123,13 +124,21 @@ if ($RunServer) {
     
     if ($ArtifactFile) {
         $FileType = $ArtifactFile.Extension.ToUpper().TrimStart('.')
-        Write-Host "   -> Starting server: java -jar $($ArtifactFile.Name)" -ForegroundColor Gray
+        
+        $JavaArgs = @("-jar", $ArtifactFile.FullName, "--spring.profiles.active=local")
+        
+        if ($DebugMode) {
+            Write-Host "   -> Debug Mode: Enabled (Listening on port 5005)" -ForegroundColor Magenta
+            $JavaArgs = @("-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005") + $JavaArgs
+        }
+
+        Write-Host "   -> Starting server: java $JavaArgs" -ForegroundColor Gray
         Write-Host "   -> File type: $FileType" -ForegroundColor Gray
-        Write-Host "   -> Port: 8080" -ForegroundColor Gray
+        Write-Host "   -> Port: 443 (HTTPS) / 8080 (HTTP)" -ForegroundColor Gray
         Write-Host "   -> Press Ctrl+C to stop" -ForegroundColor Gray
         Write-Host ""
         
-        & java -jar $ArtifactFile.FullName
+        & java $JavaArgs
     }
     else {
         Write-Host "   X JAR/WAR file not found to run." -ForegroundColor Red

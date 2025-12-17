@@ -1,36 +1,16 @@
 import {
     Chart as ChartJS,
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    BarElement,
-    Title,
-    Tooltip,
-    Legend,
-    ArcElement,
-    RadialLinearScale,
+    registerables
 } from 'chart.js'
 import { Chart } from 'react-chartjs-2'
 import { useRef } from 'react'
 import Modal from './Modal'
 
-ChartJS.register(
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    BarElement,
-    Title,
-    Tooltip,
-    Legend,
-    ArcElement,
-    RadialLinearScale
-)
+ChartJS.register(...registerables)
 
 const ChartResultModal = ({ isOpen, onClose, chartData, chartType = 'bar' }) => {
     const chartRef = useRef(null)
-    
+
     if (!isOpen || !chartData) return null
 
     // Ensure chartData has datasets
@@ -77,12 +57,12 @@ const ChartResultModal = ({ isOpen, onClose, chartData, chartType = 'bar' }) => 
     // Adjust options for specific chart types if needed
     if (chartType === 'pie' || chartType === 'doughnut' || chartType === 'polarArea' || chartType === 'radar') {
         delete options.scales
-        
+
         // Generate random colors for each label
         const labelCount = safeChartData.labels?.length || 0
         const backgroundColors = []
         const borderColors = []
-        
+
         for (let i = 0; i < labelCount; i++) {
             const r = Math.floor(Math.random() * 255)
             const g = Math.floor(Math.random() * 255)
@@ -90,7 +70,7 @@ const ChartResultModal = ({ isOpen, onClose, chartData, chartType = 'bar' }) => 
             backgroundColors.push(`rgba(${r}, ${g}, ${b}, 0.7)`)
             borderColors.push(`rgba(${r}, ${g}, ${b}, 1)`)
         }
-        
+
         // Apply colors to all datasets
         if (safeChartData.datasets) {
             safeChartData.datasets.forEach(dataset => {
