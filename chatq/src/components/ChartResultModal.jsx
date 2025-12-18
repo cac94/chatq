@@ -54,31 +54,50 @@ const ChartResultModal = ({ isOpen, onClose, chartData, chartType = 'bar' }) => 
         }
     }
 
-    // Adjust options for specific chart types if needed
-    if (chartType === 'pie' || chartType === 'doughnut' || chartType === 'polarArea' || chartType === 'radar') {
-        delete options.scales
+    // Generate random colors for datasets
+    if (safeChartData.datasets) {
+        safeChartData.datasets.forEach((dataset, index) => {
+            if (chartType === 'pie' || chartType === 'doughnut' || chartType === 'polarArea' || chartType === 'radar') {
+                // Generate random colors for each data point
+                const labelCount = safeChartData.labels?.length || 0
+                const backgroundColors = []
+                const borderColors = []
 
-        // Generate random colors for each label
-        const labelCount = safeChartData.labels?.length || 0
-        const backgroundColors = []
-        const borderColors = []
-
-        for (let i = 0; i < labelCount; i++) {
-            const r = Math.floor(Math.random() * 255)
-            const g = Math.floor(Math.random() * 255)
-            const b = Math.floor(Math.random() * 255)
-            backgroundColors.push(`rgba(${r}, ${g}, ${b}, 0.7)`)
-            borderColors.push(`rgba(${r}, ${g}, ${b}, 1)`)
-        }
-
-        // Apply colors to all datasets
-        if (safeChartData.datasets) {
-            safeChartData.datasets.forEach(dataset => {
+                for (let i = 0; i < labelCount; i++) {
+                    const r = Math.floor(Math.random() * 255)
+                    const g = Math.floor(Math.random() * 255)
+                    const b = Math.floor(Math.random() * 255)
+                    backgroundColors.push(`rgba(${r}, ${g}, ${b}, 0.7)`)
+                    borderColors.push(`rgba(${r}, ${g}, ${b}, 1)`)
+                }
                 dataset.backgroundColor = backgroundColors
                 dataset.borderColor = borderColors
                 dataset.borderWidth = 1
-            })
-        }
+            } else {
+                // Generate a single random color for the entire dataset (line, bar, etc.)
+                // Use a hash-like approach or just random based on index/random
+                const r = Math.floor(Math.random() * 255)
+                const g = Math.floor(Math.random() * 255)
+                const b = Math.floor(Math.random() * 255)
+
+                dataset.backgroundColor = `rgba(${r}, ${g}, ${b}, 0.5)`
+                dataset.borderColor = `rgba(${r}, ${g}, ${b}, 1)`
+                dataset.borderWidth = 2
+
+                if (chartType === 'line') {
+                    dataset.tension = 0.4
+                    dataset.fill = true
+                    dataset.pointBackgroundColor = `rgba(${r}, ${g}, ${b}, 1)`
+                    dataset.pointBorderColor = '#fff'
+                    dataset.pointHoverBackgroundColor = '#fff'
+                    dataset.pointHoverBorderColor = `rgba(${r}, ${g}, ${b}, 1)`
+                }
+            }
+        })
+    }
+
+    if (chartType === 'pie' || chartType === 'doughnut' || chartType === 'polarArea' || chartType === 'radar') {
+        delete options.scales
     }
 
     return (
