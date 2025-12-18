@@ -2,6 +2,7 @@ package kr.chatq.server.chatq_server.service;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -9,10 +10,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 @Service
 public class PromptMakerService {
     private static final Logger logger = LoggerFactory.getLogger(PromptMakerService.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private DbService dbService;
     private javax.sql.DataSource dataSource;
@@ -54,6 +58,7 @@ public class PromptMakerService {
             List<String> columnList = new ArrayList<>();
             List<String> columnNmList = new ArrayList<>();
             List<String> headerColumnList = new ArrayList<>();
+            Map<String, String> codeMaps = new HashMap<>();
 
             for (int i = 0; i < columns.size(); i++) {
                 Map<String, Object> column = columns.get(i);
@@ -61,6 +66,10 @@ public class PromptMakerService {
                 String columnName = column.get("column_nm") != null ? column.get("column_nm").toString() : "";
                 String columnDesc = column.get("column_desc") != null ? column.get("column_desc").toString() : "";
                 String subqueryYn = column.get("subquery_yn") != null ? column.get("subquery_yn").toString() : "N";
+                String codeMap = column.get("code_map") != null ? column.get("code_map").toString() : "";
+                if (!codeMap.isEmpty()) {
+                    codeMaps.put(columnName, codeMap);
+                }
                 String headerColumnYn = column.get("header_column_yn") != null
                         ? column.get("header_column_yn").toString()
                         : "N";
@@ -87,6 +96,7 @@ public class PromptMakerService {
             infos.put(tableAlias, queryBuilder.toString());
             table.put("headerColumns", headerColumnList);
             table.put("columnNmList", columnNmList);
+            table.put("codeMaps", codeMaps);
         }
         promptBuilder.append("}\\n 이 json 내용을 참고하여 [[").append(message).append("]]  문의에 가장 가까운 정보종류를 ")
                 .append(String.join(", ", tableAliasList)).append(" 중에서 어느 것인지 한 개만 골라줘.");
@@ -109,15 +119,27 @@ public class PromptMakerService {
         return result;
     }
 
-    public Map<String, Object> getQueryPrompt(String baseQuery, String message) throws SQLException {
+    public Map<String, Object> getQueryPrompt(String baseQuery, String message, Map<String, String> codeMaps)
+            throws SQLException {
         Map<String, Object> result = new java.util.HashMap<>();
 
+        String codeMapsJson = "";
+        try {
+            codeMapsJson = objectMapper.writeValueAsString(codeMaps);
+        } catch (JsonProcessingException e) {
+            logger.error("Error converting codeMaps to JSON", e);
+        }
+
         StringBuilder promptBuilder = new StringBuilder();
+        if (!codeMapsJson.equals("{}")) {
+            promptBuilder.append("다음은 칼럼별 허용 값 정보이다. 쿼리 작성시 참고해라: ").append(codeMapsJson).append("\\n\\n");
+        }
         promptBuilder.append("```sql\\n").append(baseQuery).append(";\\n```\\n 앞의 sql문을 수정하여 [[")
                 // .append(message).append("]] 문의에 답변하기 위한 쿼리문을 작성해줘. 어떤 토큰 문자열(<|...|>)도 출력하지
                 // 말고 작성한 쿼리문만 답해줘.");
                 .append(message).append("]] 문의에 답변하기 위한 ").append(dbProductName())
-                .append(" 쿼리문을 작성해줘. 날짜형식은 '" + dateFormat + "'이고 column alias는 유지해줘. 작성한 쿼리문만 출력해줘.");
+                .append(" 쿼리문을 작성해줘.")
+                .append(" 날짜형식은 '" + dateFormat + "'이고 column alias는 유지해줘. 작성한 쿼리문만 출력해줘.");
 
         String prompt = promptBuilder.toString();
 

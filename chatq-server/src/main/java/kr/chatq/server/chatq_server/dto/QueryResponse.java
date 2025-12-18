@@ -3,7 +3,6 @@ package kr.chatq.server.chatq_server.dto;
 import java.util.List;
 import java.util.Map;
 
-
 public class QueryResponse {
     private List<String> columns;
     private List<Map<String, Object>> data;
@@ -18,6 +17,7 @@ public class QueryResponse {
     private String tableName;
     private String tableAlias;
     private String lastDetailYn;
+    private Map<String, String> codeMaps;
 
     public String getTableName() {
         return tableName;
@@ -121,5 +121,13 @@ public class QueryResponse {
 
     public void setLastDetailYn(String lastDetailYn) {
         this.lastDetailYn = lastDetailYn;
+    }
+
+    public Map<String, String> getCodeMaps() {
+        return codeMaps;
+    }
+
+    public void setCodeMaps(Map<String, String> codeMaps) {
+        this.codeMaps = codeMaps;
     }
 }

@@ -1,6 +1,7 @@
 package kr.chatq.server.chatq_server.dto;
 
 import java.util.List;
+import java.util.Map;
 
 public class QueryRequest {
     private String prompt;
@@ -12,6 +13,7 @@ public class QueryRequest {
     private String tableAlias;
     private List<String> headerColumns;
     private List<String> lastColumns;
+    private Map<String, String> codeMaps;
 
     public String getPrompt() {
         return prompt;
@@ -83,5 +85,13 @@ public class QueryRequest {
 
     public void setLastColumns(List<String> lastColumns) {
         this.lastColumns = lastColumns;
+    }
+
+    public Map<String, String> getCodeMaps() {
+        return codeMaps;
+    }
+
+    public void setCodeMaps(Map<String, String> codeMaps) {
+        this.codeMaps = codeMaps;
     }
 }

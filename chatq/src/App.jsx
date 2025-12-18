@@ -58,6 +58,7 @@ const App = () => {
   const [tableAlias, setTableAlias] = useState(null)
   const [headerColumns, setHeaderColumns] = useState(null)
   const [lastColumns, setLastColumns] = useState(null)
+  const [codeMaps, setCodeMaps] = useState(null)
   // ChatQ session history: each session stores its first query and tableAlias
   const [sessions, setSessions] = useState([]) // { id, firstQuery, tableAlias, startedAt }
   const [currentSessionId, setCurrentSessionId] = useState(null)
@@ -166,6 +167,7 @@ const App = () => {
           postData.tableAlias = overrideTableAlias || selectedInfo || tableAlias
           if (headerColumns) postData.headerColumns = headerColumns
           if (lastColumns) postData.lastColumns = lastColumns
+          if (codeMaps) postData.codeMaps = codeMaps
         } else {
           postData.tableAlias = overrideTableAlias || selectedInfo
         }
@@ -215,6 +217,7 @@ const App = () => {
           setHeaderColumns(response.data.headerColumns)
         }
         setLastColumns(response.data.lastColumns || null)
+        setCodeMaps(response.data.codeMaps || null)
 
         // Clear input only if not a replay (avoid flashing same text before send)
         setQuery('')

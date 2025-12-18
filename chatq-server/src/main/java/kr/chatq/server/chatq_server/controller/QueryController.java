@@ -64,16 +64,16 @@ public class QueryController {
     public ResponseEntity<QueryResponse> executeChatQuery(@RequestBody QueryRequest request) {
         try {
             QueryResponse response = queryService.executeChatQuery(
-                request.getConversationId(), 
-                request.getPrompt(), 
-                request.getLastDetailYn(), 
-                request.getLastQuery(), 
-                request.getTableQuery(), 
-                request.getTableName(), 
-                request.getTableAlias(),
-                request.getHeaderColumns(),
-                request.getLastColumns()
-            );
+                    request.getConversationId(),
+                    request.getPrompt(),
+                    request.getLastDetailYn(),
+                    request.getLastQuery(),
+                    request.getTableQuery(),
+                    request.getTableName(),
+                    request.getTableAlias(),
+                    request.getHeaderColumns(),
+                    request.getLastColumns(),
+                    request.getCodeMaps());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
@@ -184,7 +184,7 @@ public class QueryController {
     @GetMapping("/auth-options")
     public ResponseEntity<List<Map<String, String>>> getAuthOptions() {
         try {
-            List<Map<String,String>> authOptions = queryService.getAuthOptions();
+            List<Map<String, String>> authOptions = queryService.getAuthOptions();
             return ResponseEntity.ok(authOptions);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();

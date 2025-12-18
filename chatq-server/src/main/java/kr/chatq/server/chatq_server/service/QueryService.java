@@ -234,7 +234,7 @@ public class QueryService {
     @SuppressWarnings("unchecked")
     public QueryResponse executeChatQuery(String conversationId, String message, String lastDetailYn, String lastQuery,
             String tableQuery, String tableName, String tableAlias, List<String> headerColumns,
-            List<String> lastColumns) throws SQLException {
+            List<String> lastColumns, Map<String, String> codeMaps) throws SQLException {
         String ollamaResponse;
         String baseQuery;
         String detailYn = lastDetailYn;
@@ -290,10 +290,11 @@ public class QueryService {
             lastQuery = baseQuery;
             lastDetailYn = detailYn;
             lastColumns = selectedTable != null ? (List<String>) selectedTable.get("columnNmList") : null;
+            codeMaps = selectedTable != null ? (Map<String, String>) selectedTable.get("codeMaps") : null;
         }
 
         // 최종 쿼리 프롬프트 생성
-        Map<String, Object> queryPromptResult = promptMakerService.getQueryPrompt(baseQuery, message);
+        Map<String, Object> queryPromptResult = promptMakerService.getQueryPrompt(baseQuery, message, codeMaps);
         String queryPrompt = (String) queryPromptResult.get("prompt");
 
         if ("openai".equalsIgnoreCase(aiType)) {
@@ -342,6 +343,7 @@ public class QueryService {
             queryResponse.setTableAlias(tableAlias);
             queryResponse.setLastDetailYn(lastDetailYn);
             queryResponse.setLastColumns(lastColumns);
+            queryResponse.setCodeMaps(codeMaps);
 
             return queryResponse;
         }
