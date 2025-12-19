@@ -134,6 +134,12 @@ public class QueryService {
     @Qualifier("secondaryDataSource")
     private DataSource secondaryDataSource;
 
+    @Autowired
+    private PromptMakerService promptMakerService;
+
+    @Autowired
+    private DbService dbService;
+
     // Spring이 ChatModel (Ollama 또는 기본 ChatModel) 빈을 찾아서 주입
     public QueryService(OllamaChatModel chatModel, OpenAiChatModel openAiChatModel) {
         this.chatModel = chatModel;
@@ -243,8 +249,9 @@ public class QueryService {
         }
 
         // 문의에 맞는 테이블을 고르는 프롬프트 생성
-        PromptMakerService promptMakerService = new PromptMakerService(new DbService(jdbcTemplate),
-                secondaryDataSource);
+        // PromptMakerService is now injected
+        // PromptMakerService promptMakerService = new PromptMakerService(new
+        // DbService(jdbcTemplate), secondaryDataSource);
 
         if (lastQuery != null && !lastQuery.isEmpty()) { // 이전 쿼리가 있으면 복호화
             tableQuery = decrypt(tableQuery);
@@ -671,7 +678,8 @@ public class QueryService {
      * @return LoginResponse
      */
     public LoginResponse processLogin(String user, String password) {
-        DbService dbService = new DbService(jdbcTemplate);
+        // DbService is now injected
+        // DbService dbService = new DbService(jdbcTemplate);
         // 1) 사용자 기본 정보 + 암호화된 비밀번호 조회
         List<Map<String, Object>> rows = dbService.getUsers(user);
         if (rows.isEmpty()) {

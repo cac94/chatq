@@ -154,6 +154,12 @@ const App = () => {
         return
       }
 
+      // Check if user is logged in
+      if (!user && !userNm) {
+        setShowLoginModal(true)
+        return
+      }
+
       setIsLoading(true)
       try {
         const postData = {

@@ -25,7 +25,8 @@ public class PromptMakerService {
     private String dateFormat;
 
     // 생성자
-    public PromptMakerService(DbService dbService, javax.sql.DataSource dataSource) {
+    public PromptMakerService(DbService dbService,
+            @org.springframework.beans.factory.annotation.Qualifier("secondaryDataSource") javax.sql.DataSource dataSource) {
         this.dbService = dbService;
         this.dataSource = dataSource;
     }
