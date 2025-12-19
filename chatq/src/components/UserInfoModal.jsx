@@ -7,6 +7,10 @@ const UserInfoModal = ({ isOpen, onClose, user, userName, auth, level, infos, on
   const [confirmPassword, setConfirmPassword] = useState('')
 
   const handleSavePassword = async () => {
+    if (user === 'guest') {
+      alert(translations[language].pwdGuestNoChange)
+      return
+    }
     if (!password) {
       alert(translations[language].pwdEmpty)
       return
