@@ -35,6 +35,8 @@ public class QueryController {
     @Autowired
     private QueryService queryService;
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(QueryController.class);
+
     @GetMapping("/test")
     public ResponseEntity<String> executeTest() {
         return ResponseEntity.ok("response from test endpoint");
@@ -92,10 +94,13 @@ public class QueryController {
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+        logger.info("Login attempt for user: {}", request.getUser());
         try {
             LoginResponse response = queryService.processLogin(request.getUser(), request.getPassword());
+            logger.info("Login response for user {}: {}", request.getUser(), response.getMessage());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            logger.error("Login exception for user {}: {}", request.getUser(), e.getMessage(), e);
             LoginResponse response = new LoginResponse("FAIL", null, null, 9, null, null, null, null);
             return ResponseEntity.ok(response);
         }

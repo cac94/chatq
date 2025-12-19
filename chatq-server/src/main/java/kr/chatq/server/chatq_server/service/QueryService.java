@@ -54,7 +54,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 @Service
 public class QueryService {
 
-    private static final Logger logger = LoggerFactory.getLogger(PromptMakerService.class);
+    private static final Logger logger = LoggerFactory.getLogger(QueryService.class);
     private final OllamaChatModel chatModel;
     private final OpenAiChatModel openAiChatModel;
 
@@ -678,11 +678,13 @@ public class QueryService {
      * @return LoginResponse
      */
     public LoginResponse processLogin(String user, String password) {
+        logger.info("Start processLogin for user: {}", user);
         // DbService is now injected
         // DbService dbService = new DbService(jdbcTemplate);
         // 1) 사용자 기본 정보 + 암호화된 비밀번호 조회
         List<Map<String, Object>> rows = dbService.getUsers(user);
         if (rows.isEmpty()) {
+            logger.warn("Login failed: User not found: {}", user);
             return new LoginResponse("FAIL", null, null, 9, null, null, null, null);
         }
 
@@ -690,8 +692,11 @@ public class QueryService {
         String hashedPassword = (String) userInfo.get("password");
         if (!user.equals("admin") && (hashedPassword == null || !matchesPwd(password, hashedPassword))) {
             // 비밀번호 불일치
+            logger.warn("Login failed: Password mismatch for user: {}", user);
             return new LoginResponse("FAIL", null, null, 9, null, null, null, null);
         }
+
+        logger.info("Login success for user: {}", user);
 
         String auth = (String) userInfo.get("auth");
         int level = ((Number) userInfo.get("level")).intValue();
@@ -885,7 +890,8 @@ public class QueryService {
     /**
      * Verify raw password against stored BCrypt hash.
      */
-    public boolean matchesPwd(String rawPassword, String hashedPassword) {
+    private boolean matchesPwd(String rawPassword, String hashedPassword) {
+        logger.debug("Verifying password...");
         if (rawPassword == null || hashedPassword == null) {
             return false;
         }

@@ -10,7 +10,11 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                .allowedOrigins("http://localhost:5174") // Vite dev server
+                .allowedOriginPatterns("*"
+                // "https://chatq.run", // 메인 도메인
+                // "https://*.chatq.run", // 모든 하위 도메인
+                // "http://localhost:5174" // 개발 환경
+                )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
