@@ -27,7 +27,6 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import kr.chatq.server.chatq_server.config.CompanyContext;
-import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpSession;
 
 import java.sql.ResultSet;
@@ -53,7 +52,6 @@ import javax.crypto.spec.SecretKeySpec;
 import javax.sql.DataSource;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import kr.chatq.server.chatq_server.service.EmbeddingService;
 
 @Service
 public class QueryService {
@@ -158,10 +156,7 @@ public class QueryService {
         this.openAiChatModel = openAiChatModel;
     }
 
-    @PostConstruct
-    public void registerInitializer() {
-        embeddingService.setInitializer(this::initMemDb);
-    }
+    // Initializer is now set during login for session-scoped EmbeddingService
 
     public QueryResponse executeQuery(String sql, String detailYn, List<String> headerColumnList) {
         if (sql == null) {
@@ -790,6 +785,12 @@ public class QueryService {
         session.setAttribute("LEVEL", level);
         session.setAttribute("INFOS", infos);
         session.setAttribute("INFO_COLUMNS", infoColumns);
+
+        // Initialize memory DB if embedding is enabled
+        if (useEmbedding) {
+            embeddingService.setInitializer(this::initMemDb);
+            initMemDb();
+        }
 
         // 4) 로그인 성공 응답 반환
         return new LoginResponse(

@@ -5,6 +5,7 @@ import com.openai.models.Embedding;
 import com.openai.models.EmbeddingCreateParams;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.annotation.SessionScope;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,6 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 @Service
+@SessionScope
 public class EmbeddingService {
 
     private final OpenAIClient openAIClient;
@@ -19,7 +21,7 @@ public class EmbeddingService {
     @Value("${spring.ai.openai.embedding.options.model:text-embedding-3-small}")
     private String embeddingModel;
 
-    private static final Map<String, List<Double>> storage = new ConcurrentHashMap<>();
+    private final Map<String, List<Double>> storage = new ConcurrentHashMap<>();
     private Runnable initializer;
     private final AtomicBoolean initializing = new AtomicBoolean(false);
 
