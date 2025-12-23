@@ -27,6 +27,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import kr.chatq.server.chatq_server.config.CompanyContext;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpSession;
 
 import java.sql.ResultSet;
@@ -156,7 +157,10 @@ public class QueryService {
         this.openAiChatModel = openAiChatModel;
     }
 
-    // Initializer is now set during login for session-scoped EmbeddingService
+    @PostConstruct
+    public void registerInitializer() {
+        embeddingService.setInitializer(this::initMemDb);
+    }
 
     public QueryResponse executeQuery(String sql, String detailYn, List<String> headerColumnList) {
         if (sql == null) {
@@ -276,10 +280,11 @@ public class QueryService {
 
             if (tableAlias == null || tableAlias.isEmpty()) {
                 if (useEmbedding) {
-                    var searchResults = embeddingService.search(message, 1);
+                    String auth = getAuth();
+                    var searchResults = embeddingService.search(auth, message, 1);
                     if (searchResults != null && !searchResults.isEmpty()) {
                         tableAlias = searchResults.get(0).getKey();
-                        logger.info("Table selected via embedding: {}", tableAlias);
+                        logger.info("Table selected via embedding for auth {}: {}", auth, tableAlias);
                     }
                 }
 
@@ -385,11 +390,12 @@ public class QueryService {
 
     @SuppressWarnings("unchecked")
     public void initMemDb() {
-        embeddingService.clear();
+        String auth = getAuth();
+        embeddingService.clear(auth);
         try {
-            Map<String, Object> result = promptMakerService.getPickTablePrompt(getAuth(), "initMemDb", 1);
+            Map<String, Object> result = promptMakerService.getPickTablePrompt(auth, "initMemDb", 1);
             List<Map<String, Object>> tables = (List<Map<String, Object>>) result.get("tables");
-            logger.info("Initializing memory DB with {} tables", tables.size());
+            logger.info("Initializing memory DB for auth {} with {} tables", auth, tables.size());
             for (Map<String, Object> table : tables) {
                 String tableAlias = table.get("table_alias") != null ? table.get("table_alias").toString() : "";
                 String keywords = table.get("keywords") != null ? table.get("keywords").toString() : "";
@@ -410,7 +416,7 @@ public class QueryService {
                 }
 
                 List<Double> vector = embeddingService.embed(textToEmbed);
-                embeddingService.save(tableAlias, vector);
+                embeddingService.save(auth, tableAlias, vector);
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -785,12 +791,6 @@ public class QueryService {
         session.setAttribute("LEVEL", level);
         session.setAttribute("INFOS", infos);
         session.setAttribute("INFO_COLUMNS", infoColumns);
-
-        // Initialize memory DB if embedding is enabled
-        if (useEmbedding) {
-            embeddingService.setInitializer(this::initMemDb);
-            initMemDb();
-        }
 
         // 4) 로그인 성공 응답 반환
         return new LoginResponse(

@@ -5,7 +5,6 @@ import com.openai.models.Embedding;
 import com.openai.models.EmbeddingCreateParams;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.context.annotation.SessionScope;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,7 +12,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 @Service
-@SessionScope
 public class EmbeddingService {
 
     private final OpenAIClient openAIClient;
@@ -21,9 +19,9 @@ public class EmbeddingService {
     @Value("${spring.ai.openai.embedding.options.model:text-embedding-3-small}")
     private String embeddingModel;
 
-    private final Map<String, List<Double>> storage = new ConcurrentHashMap<>();
+    private static final Map<String, Map<String, List<Double>>> storage = new ConcurrentHashMap<>();
     private Runnable initializer;
-    private final AtomicBoolean initializing = new AtomicBoolean(false);
+    private static final AtomicBoolean initializing = new AtomicBoolean(false);
 
     public EmbeddingService(OpenAIClient openAIClient) {
         this.openAIClient = openAIClient;
@@ -43,24 +41,28 @@ public class EmbeddingService {
         return embedding.embedding();
     }
 
-    public void save(String text, List<Double> vector) {
-        storage.put(text, vector);
+    public void save(String dbName, String text, List<Double> vector) {
+        storage.computeIfAbsent(dbName, k -> new ConcurrentHashMap<>()).put(text, vector);
     }
 
-    public List<Double> get(String text) {
-        return storage.get(text);
+    public List<Double> get(String dbName, String text) {
+        Map<String, List<Double>> dbStorage = storage.get(dbName);
+        return dbStorage != null ? dbStorage.get(text) : null;
     }
 
-    public void clear() {
-        storage.clear();
+    public void clear(String dbName) {
+        Map<String, List<Double>> dbStorage = storage.get(dbName);
+        if (dbStorage != null) {
+            dbStorage.clear();
+        }
     }
 
     public void setInitializer(Runnable initializer) {
         this.initializer = initializer;
     }
 
-    public List<Map.Entry<String, Double>> search(String queryText, int topN) {
-        if (storage.isEmpty() && initializer != null) {
+    public List<Map.Entry<String, Double>> search(String dbName, String queryText, int topN) {
+        if ((!storage.containsKey(dbName) || storage.get(dbName).isEmpty()) && initializer != null) {
             if (initializing.compareAndSet(false, true)) {
                 try {
                     initializer.run();
@@ -69,9 +71,11 @@ public class EmbeddingService {
                 }
             }
         }
+
+        Map<String, List<Double>> dbStorage = storage.getOrDefault(dbName, new HashMap<>());
         List<Double> queryVector = embed(queryText);
 
-        return storage.entrySet().stream()
+        return dbStorage.entrySet().stream()
                 .map(entry -> new AbstractMap.SimpleEntry<>(
                         entry.getKey(),
                         cosineSimilarity(queryVector, entry.getValue())))
