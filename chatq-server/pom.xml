@@ -69,7 +69,26 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- OpenAI Java SDK -->
+		<dependency>
+			<groupId>com.openai</groupId>
+			<artifactId>openai-java</artifactId>
+			<version>0.11.0</version>
+		</dependency>
+
+		<!-- JSON (선택) -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
 	</dependencies>
+
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
 	<dependencyManagement>
 		<dependencies>
 			<dependency>

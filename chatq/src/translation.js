@@ -3,14 +3,13 @@ const translations = {
         tipsTitle: "ChatQ 사용 팁",
         tipsSubtitle: "아래 사용 팁은 필수적인 것은 아니지만 참고하면 도움이 됩니다.",
         tips: [
-            "우측 상단의 사용자 정보 아이콘을 클릭하여 접근가능정보를 확인하세요.",
-            "접근가능정보를 문의 내용에 포함하면 더 정확한 답변을 받을 수 있습니다.",
-            "첫 문의를 입력할 때는 되도록 정보내역을 조회하세요.(예: 홍길동의 2025년 7월 발주내역)",
-            "동일한 정보 안에서 질문을 이어가세요.(예1: 그 다음 달은?, 예2: 총 건수와 총금액은?)",
+            "동일한 검색대상 정보 안에서 질문을 이어가면 이 전의 질문과 연결됩니다.(예1: 그 다음 달은?, 예2: 총 건수와 총금액은?)",
             "다른 정보를 조회할 때는 ChatQ 로고를 클릭하여 새 ChatQ를 시작하세요.",
-            "좌측 이력에서 내 ChatQ 주제를 클릭하면 해당 주제를 다시 실행합니다.",
+            "우측 내 ChatQ 주제 이력에서 클릭하면 해당 주제를 다시 실행합니다.",
             "데이터가 많을 경우 자동으로 개수를 제한합니다.",
-            "정보중에 상세내역인 경우는 요약정보로 제공됩니다. 클릭하면 상세내역을 확인할 수 있습니다."
+            "정보중에 상세내역인 경우는 요약정보로 제공됩니다. 클릭하면 상세내역을 확인할 수 있습니다.",
+            "정보를 조회할 때는 검색대상을 지정하면 검색이 더 빠르고 정확해집니다.",
+            "그리드 우측 상단에 검색 문장 복사, Excel로 다운로드, 상세보기, 차트생성 버튼이 있습니다."
         ],
         loginFail: '로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.',
         welcome: '{name}님 환영합니다!',
@@ -82,14 +81,13 @@ const translations = {
         tipsTitle: "ChatQ Usage Tips",
         tipsSubtitle: "The following tips are not mandatory but helpful to know.",
         tips: [
-            "Click the user info icon in the top right to check your accessible information.",
-            "Including accessible information in your query helps get more accurate answers.",
-            "For the first query, try to search for specific information records (e.g., Hong Gildong's order history for July 2025).",
-            "Continue asking questions within the same context (e.g., \"How about the next month?\", \"What is the total count and amount?\").",
-            "Click the ChatQ logo to start a new session when searching for different information.",
-            "Click a topic in the left history to replay that session.",
+            "When you continue asking questions within the same search target, they are linked to the previous query (e.g., 'What about next month?', 'What are the total count and amount?').",
+            "Click the ChatQ logo to start a new session when looking up different information.",
+            "Click a topic in the right-hand ChatQ history to replay that session.",
             "If there is a lot of data, the count is automatically limited.",
-            "Detailed information is provided as a summary. Click to view the full details."
+            "Detailed information is provided as a summary. Click to view the full details.",
+            "Specifying a search target makes searches faster and more accurate.",
+            "The grid’s top right has buttons for copying the query, downloading as Excel, viewing details, and generating charts."
         ],
         loginFail: 'Login failed. Please check your ID and password.',
         welcome: 'Welcome, {name}!',

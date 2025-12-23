@@ -24,7 +24,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import kr.chatq.server.chatq_server.config.CompanyContext;
-
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpSession;
 
 import java.sql.ResultSet;
@@ -50,6 +50,7 @@ import javax.crypto.spec.SecretKeySpec;
 import javax.sql.DataSource;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import kr.chatq.server.chatq_server.service.EmbeddingService;
 
 @Service
 public class QueryService {
@@ -140,10 +141,18 @@ public class QueryService {
     @Autowired
     private DbService dbService;
 
+    @Autowired
+    private EmbeddingService embeddingService;
+
     // Spring이 ChatModel (Ollama 또는 기본 ChatModel) 빈을 찾아서 주입
     public QueryService(OllamaChatModel chatModel, OpenAiChatModel openAiChatModel) {
         this.chatModel = chatModel;
         this.openAiChatModel = openAiChatModel;
+    }
+
+    @PostConstruct
+    public void registerInitializer() {
+        embeddingService.setInitializer(this::initMemDb);
     }
 
     public QueryResponse executeQuery(String sql, String detailYn, List<String> headerColumnList) {
@@ -359,6 +368,20 @@ public class QueryService {
         response.setMessage("FAIL");
 
         return response;
+    }
+
+    public void initMemDb() {
+        embeddingService.clear();
+        String sql = "SELECT table_nm, table_alias, table_desc FROM chatqtable";
+        List<Map<String, Object>> tables = jdbcTemplate.queryForList(sql);
+        logger.info("Initializing memory DB with {} tables", tables.size());
+        for (Map<String, Object> table : tables) {
+            String tableAlias = table.get("table_alias") != null ? table.get("table_alias").toString() : "";
+            String tableDesc = table.get("table_desc") != null ? table.get("table_desc").toString() : "";
+            String textToEmbed = String.format("Table Alias: %s, Description: %s", tableAlias, tableDesc);
+            List<Double> vector = embeddingService.embed(textToEmbed);
+            embeddingService.save("__" + tableAlias + "__ " + textToEmbed, vector);
+        }
     }
 
     public QueryResponse executeNewChat() {

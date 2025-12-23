@@ -333,7 +333,7 @@ const App = () => {
       {/* Fixed header with input */}
       <div className="sticky top-0 bg-gradient-to-b from-slate-900 to-slate-900/95 p-4 shadow-xl backdrop-blur-sm z-50" ref={inputContainerRef}>
         {/* Header actions (float right) */}
-        <div className="absolute top-4 right-4 flex items-center gap-2 z-[60]">
+        <div className="flex items-center gap-2 z-[60] md:absolute md:top-4 md:right-4 mb-2 md:mb-0">
           <button
             className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-300 hover:text-white font-medium"
             onClick={() => setLanguage(prev => prev === 'ko' ? 'en' : 'ko')}
@@ -415,7 +415,7 @@ const App = () => {
           </div>
           <div className="flex-1 pr-2">
             <div className="relative">
-              <img src={chatqLogo} alt="ChatQ" className="absolute left-3 top-1/2 -translate-y-1/2 h-6 w-6" />
+              <img src={chatqLogo} alt="ChatQ" className="absolute left-3 top-1/2 -translate-y-1/2 h-6 w-6 cursor-pointer" onClick={handleResetSession} />
               <input
                 type="text"
                 value={query}
