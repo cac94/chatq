@@ -3,6 +3,9 @@ package kr.chatq.server.chatq_server.service;
 import kr.chatq.server.chatq_server.dto.LoginResponse;
 import kr.chatq.server.chatq_server.dto.QueryResponse;
 import kr.chatq.server.chatq_server.dto.UserDto;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -62,6 +65,8 @@ public class QueryService {
     // 대화 메모리를 저장할 Map (conversationId -> 메시지 리스트)
     private final Map<String, List<Message>> conversationMemory = new HashMap<>();
 
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
     // application.properties 의 spring.ai.ollama.chat.options.model 값을 aimodel 변수로
     // 선언
     @Value("${spring.ai.ollama.chat.options.model}")
@@ -106,6 +111,9 @@ public class QueryService {
     // Spring AI type (ollama or openai)
     @Value("${spring.ai.type:ollama}")
     private String aiType;
+
+    @Value("${spring.ai.use-embedding:false}")
+    private boolean useEmbedding;
 
     // Encryption secret for reversible encryption (AES-GCM)
     @Value("${chatq.encrypt.secret:chatq-default-secret-key-32-bytes!!}")
@@ -272,20 +280,30 @@ public class QueryService {
             Map<String, String> infos = (Map<String, String>) result.get("infos");
 
             if (tableAlias == null || tableAlias.isEmpty()) {
-                if ("openai".equalsIgnoreCase(aiType)) {
-                    ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(prompt)
-                            : sendChatToOpenAI(conversationId, prompt);
-                } else {
-                    ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(prompt)
-                            : sendChatToOllama(conversationId, prompt);
+                if (useEmbedding) {
+                    var searchResults = embeddingService.search(message, 1);
+                    if (searchResults != null && !searchResults.isEmpty()) {
+                        tableAlias = searchResults.get(0).getKey();
+                        logger.info("Table selected via embedding: {}", tableAlias);
+                    }
                 }
 
-                // logging ollamaResponse
-                System.out.println(aiType + " Response: " + ollamaResponse);
-                logger.info("{} Response: {}", aiType, ollamaResponse);
+                if (tableAlias == null || tableAlias.isEmpty()) {
+                    if ("openai".equalsIgnoreCase(aiType)) {
+                        ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(prompt)
+                                : sendChatToOpenAI(conversationId, prompt);
+                    } else {
+                        ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(prompt)
+                                : sendChatToOllama(conversationId, prompt);
+                    }
 
-                // 선택된 테이블의 alias 추출 후 기본 쿼리 가져오기
-                tableAlias = extractBetweenDoubleUnderscores(ollamaResponse);
+                    // logging ollamaResponse
+                    System.out.println(aiType + " Response: " + ollamaResponse);
+                    logger.info("{} Response: {}", aiType, ollamaResponse);
+
+                    // 선택된 테이블의 alias 추출 후 기본 쿼리 가져오기
+                    tableAlias = extractBetweenDoubleUnderscores(ollamaResponse);
+                }
             }
             baseQuery = infos.get(tableAlias);
 
@@ -370,17 +388,37 @@ public class QueryService {
         return response;
     }
 
+    @SuppressWarnings("unchecked")
     public void initMemDb() {
         embeddingService.clear();
-        String sql = "SELECT table_nm, table_alias, table_desc FROM chatqtable";
-        List<Map<String, Object>> tables = jdbcTemplate.queryForList(sql);
-        logger.info("Initializing memory DB with {} tables", tables.size());
-        for (Map<String, Object> table : tables) {
-            String tableAlias = table.get("table_alias") != null ? table.get("table_alias").toString() : "";
-            String tableDesc = table.get("table_desc") != null ? table.get("table_desc").toString() : "";
-            String textToEmbed = String.format("Table Alias: %s, Description: %s", tableAlias, tableDesc);
-            List<Double> vector = embeddingService.embed(textToEmbed);
-            embeddingService.save("__" + tableAlias + "__ " + textToEmbed, vector);
+        try {
+            Map<String, Object> result = promptMakerService.getPickTablePrompt(getAuth(), "initMemDb", 1);
+            List<Map<String, Object>> tables = (List<Map<String, Object>>) result.get("tables");
+            logger.info("Initializing memory DB with {} tables", tables.size());
+            for (Map<String, Object> table : tables) {
+                String tableAlias = table.get("table_alias") != null ? table.get("table_alias").toString() : "";
+                String keywords = table.get("keywords") != null ? table.get("keywords").toString() : "";
+                List<String> columnNmList = table.get("columnNmList") != null ? (List<String>) table.get("columnNmList")
+                        : new ArrayList<>();
+
+                Map<String, Object> embedMap = new HashMap<>();
+                embedMap.put("Table Alias", tableAlias);
+                embedMap.put("Description Keywords", keywords);
+                embedMap.put("Column Name List", columnNmList);
+
+                String textToEmbed;
+                try {
+                    textToEmbed = objectMapper.writeValueAsString(embedMap);
+                } catch (JsonProcessingException e) {
+                    logger.error("Error creating JSON for embedding", e);
+                    textToEmbed = String.format("Table Alias: %s, Description Keywords: %s", tableAlias, keywords);
+                }
+
+                List<Double> vector = embeddingService.embed(textToEmbed);
+                embeddingService.save(tableAlias, vector);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
     }
 
