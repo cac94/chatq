@@ -138,7 +138,8 @@ const App = () => {
 
     if (effectivePrompt.trim()) {
       // Check if search target has changed - only when user manually selected different target
-      if (!ignoreContext && selectedInfo && selectedInfo !== '' && tableAlias && selectedInfo !== tableAlias) {
+      console.log('ignoreContext:', ignoreContext, 'tableAlias:', tableAlias, 'selectedInfo:', selectedInfo)
+      if (!ignoreContext && tableAlias && selectedInfo !== tableAlias) {
         // Use setTimeout to ensure state updates are processed
         const tempTableAlias = String(selectedInfo) // Capture current selectedInfo value
         setTimeout(() => {
