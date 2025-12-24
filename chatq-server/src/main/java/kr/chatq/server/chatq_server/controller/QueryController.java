@@ -116,10 +116,10 @@ public class QueryController {
         }
     }
 
-    @GetMapping("/initmemdb")
-    public ResponseEntity<String> initMemDb() {
+    @GetMapping("/initmemdballauths")
+    public ResponseEntity<String> initMemDbAllAuths() {
         try {
-            queryService.initMemDb();
+            queryService.initMemDbAllAuths();
             return ResponseEntity.ok("Memory DB initialized successfully");
         } catch (Exception e) {
             logger.error("Error initializing memory DB", e);

@@ -1,16 +1,16 @@
-const Modal = ({ isOpen, onClose, children }) => {
+const Modal = ({ isOpen, onClose, children, maxWidth = 'max-w-4xl' }) => {
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
     >
-      <div 
-        className="bg-slate-800 rounded-lg p-6 w-full max-w-4xl mx-4 relative shadow-2xl border border-slate-600"
+      <div
+        className={`bg-slate-800 rounded-lg p-6 w-full ${maxWidth} mx-4 relative shadow-2xl border border-slate-600`}
         onClick={(e) => e.stopPropagation()}
       >
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-4 right-4 text-slate-400 hover:text-white"
         >

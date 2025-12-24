@@ -77,13 +77,13 @@ const InfoManagement = ({ isOpen, onClose }) => {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose}>
-      <div className="w-[1200px] mx-auto">
+    <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[1200px]">
+      <div className="w-full">
         <h2 className="text-xl font-bold text-white mb-6">정보 관리</h2>
-        
+
         <div className="flex gap-4">
           {/* Left Panel - Info List */}
-          <div className="w-1/3">{/* w-1/3 makes it half of remaining space when column panel takes 2/3 */}
+          <div className="w-1/2">
             <h3 className="text-base font-semibold text-white mb-4">정보 목록</h3>
 
             {/* Info Grid */}
@@ -98,11 +98,10 @@ const InfoManagement = ({ isOpen, onClose }) => {
                   </thead>
                   <tbody>
                     {infos.map((info) => (
-                      <tr 
-                        key={info.table_nm} 
-                        className={`border-t border-slate-700 cursor-pointer ${
-                          selectedInfo?.table_nm === info.table_nm ? 'bg-blue-600/30' : 'hover:bg-slate-750'
-                        }`}
+                      <tr
+                        key={info.table_nm}
+                        className={`border-t border-slate-700 cursor-pointer ${selectedInfo?.table_nm === info.table_nm ? 'bg-blue-600/30' : 'hover:bg-slate-750'
+                          }`}
                         onClick={() => handleInfoSelect(info)}
                       >
                         <td className="px-3 py-2 text-center text-slate-300 text-sm">{info.table_nm}</td>
@@ -116,7 +115,7 @@ const InfoManagement = ({ isOpen, onClose }) => {
           </div>
 
           {/* Right Panel - Column List */}
-          <div className="w-1/3">
+          <div className="w-1/2">
             <div className="mb-4">
               <h3 className="text-base font-semibold text-white">
                 칼럼 정보 {selectedInfo && `- ${selectedInfo.table_alias}`}
@@ -145,7 +144,7 @@ const InfoManagement = ({ isOpen, onClose }) => {
                             onChange={async (e) => {
                               const newLevel = e.target.value
                               // Update locally first for immediate feedback
-                              const updatedColumns = columns.map(c => 
+                              const updatedColumns = columns.map(c =>
                                 c.column_cd === column.column_cd ? { ...c, level: newLevel } : c
                               )
                               setColumns(updatedColumns)

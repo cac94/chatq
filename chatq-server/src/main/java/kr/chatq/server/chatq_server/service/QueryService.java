@@ -1,5 +1,6 @@
 package kr.chatq.server.chatq_server.service;
 
+import kr.chatq.server.chatq_server.dto.AuthDto;
 import kr.chatq.server.chatq_server.dto.LoginResponse;
 import kr.chatq.server.chatq_server.dto.QueryResponse;
 import kr.chatq.server.chatq_server.dto.UserDto;
@@ -388,9 +389,20 @@ public class QueryService {
         return response;
     }
 
-    @SuppressWarnings("unchecked")
     public void initMemDb() {
         String auth = getAuth();
+        initMemDb(auth);
+    }
+
+    public void initMemDbAllAuths() {
+        List<AuthDto> auths = getAuths();
+        for (AuthDto auth : auths) {
+            initMemDb(auth.getAuth());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public void initMemDb(String auth) {
         embeddingService.clear(auth);
         try {
             Map<String, Object> result = promptMakerService.getPickTablePrompt(auth, "initMemDb", 1);
@@ -1022,6 +1034,8 @@ public class QueryService {
                 jdbcTemplate.update(authSql, auth.getAuth(), info.trim(), company);
             }
         }
+
+        initMemDb(auth.getAuth());
     }
 
     /**
@@ -1051,6 +1065,8 @@ public class QueryService {
                 jdbcTemplate.update(authSql, authId, info.trim(), addDate, addTime, currentUser, company);
             }
         }
+
+        initMemDb(auth.getAuth());
     }
 
     /**
