@@ -48,6 +48,7 @@ public class QueryController {
             QueryResponse response = queryService.executeQuery(request.getPrompt(), "N", new ArrayList<>());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            logger.error("Error executing query: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -58,6 +59,7 @@ public class QueryController {
             QueryResponse response = queryService.executeChat(request.getConversationId(), request.getPrompt());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            logger.error("Error executing chat: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -78,6 +80,7 @@ public class QueryController {
                     request.getCodeMaps());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            logger.error("Error executing chat query: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -88,6 +91,7 @@ public class QueryController {
             QueryResponse response = queryService.executeNewChat();
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            logger.error("Error executing new chat: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -112,6 +116,7 @@ public class QueryController {
             queryService.processLogout();
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            logger.error("Error during logout: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -139,6 +144,7 @@ public class QueryController {
             List<UserDto> users = queryService.getUsers();
             return ResponseEntity.ok(users);
         } catch (Exception e) {
+            logger.error("Error fetching users: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -149,6 +155,7 @@ public class QueryController {
             queryService.createUser(user);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            logger.error("Error creating user: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -159,6 +166,7 @@ public class QueryController {
             queryService.updateUser(userId, user);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            logger.error("Error updating user {}: {}", userId, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -169,6 +177,7 @@ public class QueryController {
             queryService.deleteUser(userId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            logger.error("Error deleting user {}: {}", userId, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -179,6 +188,7 @@ public class QueryController {
             queryService.resetPassword(userId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            logger.error("Error resetting password for user {}: {}", userId, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -193,6 +203,7 @@ public class QueryController {
             queryService.changePassword(userId, request.getCurrentPassword(), request.getNewPassword());
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            logger.error("Error changing password: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -203,6 +214,7 @@ public class QueryController {
             List<Map<String, String>> authOptions = queryService.getAuthOptions();
             return ResponseEntity.ok(authOptions);
         } catch (Exception e) {
+            logger.error("Error fetching auth options: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -213,6 +225,7 @@ public class QueryController {
             List<AuthDto> auths = queryService.getAuths();
             return ResponseEntity.ok(auths);
         } catch (Exception e) {
+            logger.error("Error fetching auths: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -223,6 +236,7 @@ public class QueryController {
             queryService.createAuth(auth);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            logger.error("Error creating auth: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -233,6 +247,7 @@ public class QueryController {
             queryService.updateAuth(authId, auth);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            logger.error("Error updating auth {}: {}", authId, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -243,6 +258,7 @@ public class QueryController {
             queryService.deleteAuth(authId);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            logger.error("Error deleting auth {}: {}", authId, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -253,6 +269,7 @@ public class QueryController {
             List<Map<String, String>> infos = queryService.getInfos();
             return ResponseEntity.ok(infos);
         } catch (Exception e) {
+            logger.error("Error fetching infos: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -263,6 +280,7 @@ public class QueryController {
             List<ColumnDto> columns = queryService.getInfoColumns(tableNm);
             return ResponseEntity.ok(columns);
         } catch (Exception e) {
+            logger.error("Error fetching info columns for table {}: {}", tableNm, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -273,6 +291,7 @@ public class QueryController {
             queryService.updateInfoColumns(tableNm, column);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            logger.error("Error updating info columns for table {}: {}", tableNm, e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -283,6 +302,7 @@ public class QueryController {
             ChartResponse response = queryService.generateChart(request);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            logger.error("Error generating chart: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }

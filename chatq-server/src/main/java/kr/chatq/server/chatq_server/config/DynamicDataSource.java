@@ -62,11 +62,11 @@ public class DynamicDataSource extends AbstractDataSource {
         try {
             // Check DB for config
             Map<String, Object> config = primaryJdbcTemplate.queryForMap(
-                    "SELECT jdbc_url, username, password, driver_class_name FROM chatqcomp WHERE company = ?",
+                    "SELECT jdbc_url, user_nm, password, driver_class_name FROM chatqcomp WHERE company = ?",
                     company);
 
             jdbcUrl = (String) config.get("jdbc_url");
-            username = (String) config.get("username");
+            username = (String) config.get("user_nm");
             password = (String) config.get("password");
             driverClassName = (String) config.get("driver_class_name");
 

@@ -183,8 +183,11 @@ public class QueryService {
         }
 
         // logging sql
-        System.out.println("Executing SQL: " + finalSql);
-        logger.info("Executing SQL: {}", finalSql);
+        String currentCompany = CompanyContext.getCompany();
+        logger.info("Executing SQL for company: {} - SQL: {}",
+                (currentCompany != null ? currentCompany : "default(chatq)"), finalSql);
+        System.out.println("Executing SQL for company: " + (currentCompany != null ? currentCompany : "default(chatq)")
+                + " - SQL: " + finalSql);
 
         QueryResponse response = new QueryResponse();
         return secondaryJdbcTemplate.query(finalSql, (ResultSet rs) -> {
@@ -431,7 +434,7 @@ public class QueryService {
                 embeddingService.save(auth, tableAlias, vector);
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            logger.error("Error in initMemDb for auth {}: {}", auth, e.getMessage(), e);
         }
     }
 
@@ -681,7 +684,7 @@ public class QueryService {
                 try {
                     return Integer.parseInt(level.toString());
                 } catch (NumberFormatException e) {
-                    logger.warn("Invalid LEVEL format in session: {}", level);
+                    logger.error("Invalid LEVEL format in session for user {}: {}", getUser(), level, e);
                 }
             }
         }
