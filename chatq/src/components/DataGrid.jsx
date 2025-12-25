@@ -43,9 +43,9 @@ const DataGrid = ({ data, columns, headerData, headerColumns, detailYn, showDeta
 
   const isNumeric = (value) => {
     if (value === null || value === undefined || value === '') return false;
-    const str = String(value);
+    const str = String(value).replace(/,/g, '');
     if (str.length > 1 && str[0] === '0' && /^\d+$/.test(str)) return false;
-    return !isNaN(parseFloat(value)) && isFinite(value);
+    return !isNaN(parseFloat(str)) && isFinite(str);
   };
 
   // Determine which columns and data to display
@@ -60,7 +60,9 @@ const DataGrid = ({ data, columns, headerData, headerColumns, detailYn, showDeta
       if (aVal === null || aVal === undefined) return 1;
       if (bVal === null || bVal === undefined) return -1;
       if (isNumeric(aVal) && isNumeric(bVal)) {
-        const diff = parseFloat(aVal) - parseFloat(bVal);
+        const aStr = String(aVal).replace(/,/g, '');
+        const bStr = String(bVal).replace(/,/g, '');
+        const diff = parseFloat(aStr) - parseFloat(bStr);
         return sortConfig.direction === 'asc' ? diff : -diff;
       }
       const comp = String(aVal).localeCompare(String(bVal));
