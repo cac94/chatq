@@ -3,6 +3,10 @@ package kr.chatq.server.chatq_server.service;
 import com.openai.client.OpenAIClient;
 import com.openai.models.Embedding;
 import com.openai.models.EmbeddingCreateParams;
+import org.springframework.ai.embedding.EmbeddingRequest;
+import org.springframework.ai.ollama.OllamaEmbeddingModel;
+import org.springframework.ai.ollama.api.OllamaOptions;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +23,15 @@ public class EmbeddingService {
     @Value("${spring.ai.openai.embedding.options.model:text-embedding-3-small}")
     private String embeddingModel;
 
+    @Value("${spring.ai.embedding.type:openai}")
+    private String embeddingType;
+
+    @Value("${spring.ai.ollama.embedding.options.model:}")
+    private String ollamaEmbeddingModelName;
+
+    @Autowired(required = false)
+    private OllamaEmbeddingModel ollamaEmbeddingModel;
+
     private static final Map<String, Map<String, List<Double>>> storage = new ConcurrentHashMap<>();
     private Runnable initializer;
     private static final AtomicBoolean initializing = new AtomicBoolean(false);
@@ -28,7 +41,25 @@ public class EmbeddingService {
     }
 
     public List<Double> embed(String text) {
+        if ("ollama".equalsIgnoreCase(embeddingType)) {
+            if (ollamaEmbeddingModel == null) {
+                throw new IllegalStateException("OllamaEmbeddingModel is not configured.");
+            }
 
+            OllamaOptions options = OllamaOptions.builder()
+                    .model(ollamaEmbeddingModelName)
+                    .build();
+            EmbeddingRequest request = new EmbeddingRequest(Collections.singletonList(text), options);
+            float[] floatVector = ollamaEmbeddingModel.call(request).getResult().getOutput();
+
+            List<Double> doubleVector = new ArrayList<>(floatVector.length);
+            for (float f : floatVector) {
+                doubleVector.add((double) f);
+            }
+            return doubleVector;
+        }
+
+        // Default to OpenAI
         EmbeddingCreateParams params = EmbeddingCreateParams.builder()
                 .model(embeddingModel)
                 .input(EmbeddingCreateParams.Input.ofString(text))
