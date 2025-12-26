@@ -335,28 +335,27 @@ public class QueryService {
         Map<String, Object> queryPromptResult = promptMakerService.getQueryPrompt(baseQuery, message, codeMaps);
         String queryPrompt = (String) queryPromptResult.get("prompt");
 
-        if ("openai".equalsIgnoreCase(aiType)) {
-            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(queryPrompt)
-                    : sendChatToOpenAI(conversationId, queryPrompt);
-        } else {
-            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(queryPrompt)
-                    : sendChatToOllama(conversationId, queryPrompt);
-        }
-
-        // logging ollamaResponse
-        System.out.println(aiType + " Response: " + ollamaResponse);
-        logger.info("{} Response: {}", aiType, ollamaResponse);
-
         // SQL문 추출
-        String sql = extractSqlFromMarkdown(ollamaResponse);
-        if ((sql == null || sql.isEmpty()) && ollamaResponse.toUpperCase().indexOf("SELECT") >= 0) {
-            // 여러 개의 SQL 추출 시도
-            sql = extractSelectStatement(ollamaResponse);
-        }
+        String sql = getSqlFromAI(conversationId, queryPrompt);
 
         if (sql != null && !sql.isEmpty()) {
             sql = sanitizeResponse(sql);
-            // sql을 암호화해서 String lastQuery에 저장
+
+            // 만약 sql에 group by 가 있을 경우 from 앞의 칼럼 항목 수가 baseQuery의 칼럼 항목 수와 일치하면 잘못된 쿼리로 판단
+            // group by 사용하지 말라는 prompt 추가 후 재시도
+            if (sql.toLowerCase().contains("group by")) {
+                String columnsBeforeFrom = sql.substring(0, sql.toLowerCase().indexOf("from")).trim();
+                int columnsCount = columnsBeforeFrom.split(",").length;
+                // baseQuery의 칼럼 항목 수 가져오기
+                String baseQueryColumns = baseQuery.substring(0, baseQuery.toLowerCase().indexOf("from")).trim();
+                int baseQueryColumnsCount = baseQueryColumns.split(",").length;
+                if (columnsCount == baseQueryColumnsCount) {
+                    String prompt = queryPrompt + "\n\n" + "하지만 집계를 사용하지 말라는 조건을 추가해 다시 작성해줘.";
+                    sql = getSqlFromAI(conversationId, prompt);
+                    sql = sanitizeResponse(sql);
+                }
+            }
+
             String sqlOrg = sql;
             if (tableQuery != null && !tableQuery.isEmpty()) {
                 sql = sql.replace(tableName, tableQuery);
@@ -465,6 +464,29 @@ public class QueryService {
     // .model("deepseek-coder:6.7b")
     // .build();
     // }
+
+    private String getSqlFromAI(String conversationId, String queryPrompt) {
+        String ollamaResponse;
+        if ("openai".equalsIgnoreCase(aiType)) {
+            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOpenAI(queryPrompt)
+                    : sendChatToOpenAI(conversationId, queryPrompt);
+        } else {
+            ollamaResponse = (conversationId == null || conversationId.isEmpty()) ? sendChatToOllama(queryPrompt)
+                    : sendChatToOllama(conversationId, queryPrompt);
+        }
+
+        // logging ollamaResponse
+        System.out.println(aiType + " Response: " + ollamaResponse);
+        logger.info("{} Response: {}", aiType, ollamaResponse);
+
+        // SQL문 추출
+        String sql = extractSqlFromMarkdown(ollamaResponse);
+        if ((sql == null || sql.isEmpty()) && ollamaResponse.toUpperCase().indexOf("SELECT") >= 0) {
+            // 여러 개의 SQL 추출 시도
+            sql = extractSelectStatement(ollamaResponse);
+        }
+        return sql;
+    }
 
     public String extractBetweenDoubleUnderscores(String text) {
         if (text == null)
