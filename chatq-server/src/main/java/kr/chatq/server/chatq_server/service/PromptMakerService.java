@@ -139,8 +139,9 @@ public class PromptMakerService {
                 // .append(message).append("]] 문의에 답변하기 위한 쿼리문을 작성해줘. 어떤 토큰 문자열(<|...|>)도 출력하지
                 // 말고 작성한 쿼리문만 답해줘.");
                 .append(message).append("]] 문의에 답변하기 위한 ").append(dbProductName())
-                .append(" 쿼리문을 작성해줘.")
-                .append(" 날짜형식은 '" + dateFormat + "'이고 column alias는 유지해줘. 작성한 쿼리문만 출력해줘.");
+                .append(" named parameter 없이 DB 명령창 에서 실행할 SQL문을 작성해줘.")
+                // .append(" 날짜형식은 '" + dateFormat + "'이고 column alias는 유지해줘. 작성한 쿼리문만 출력해줘.");
+                .append(" column alias는 유지해줘. 작성한 쿼리문만 출력해줘.");
 
         String prompt = promptBuilder.toString();
 
