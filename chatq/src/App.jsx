@@ -731,18 +731,21 @@ const App = () => {
       <UserManagement
         isOpen={showUserManagement}
         onClose={() => setShowUserManagement(false)}
+        language={language}
       />
 
       {/* Auth Management Modal */}
       <AuthManagement
         isOpen={showAuthManagement}
         onClose={() => setShowAuthManagement(false)}
+        language={language}
       />
 
       {/* Info Management Modal */}
       <InfoManagement
         isOpen={showInfoManagement}
         onClose={() => setShowInfoManagement(false)}
+        language={language}
       />
 
       {/* Chart Prompt Modal */}

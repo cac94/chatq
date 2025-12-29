@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import Modal from './Modal'
 import axios from 'axios'
+import translations from '../translation'
 
-const UserManagement = ({ isOpen, onClose }) => {
+const UserManagement = ({ isOpen, onClose, language = 'ko' }) => {
   const [users, setUsers] = useState([])
   const [authOptions, setAuthOptions] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -15,6 +16,9 @@ const UserManagement = ({ isOpen, onClose }) => {
     auth: '',
     level: ''
   })
+
+  // Use language from props
+  const t = translations[language]
 
   useEffect(() => {
     if (isOpen) {
@@ -76,27 +80,28 @@ const UserManagement = ({ isOpen, onClose }) => {
   }
 
   const handleDelete = async (userId) => {
-    if (window.confirm(`사용자 '${userId}'를 삭제하시겠습니까?`)) {
+    if (window.confirm(t.userDeleteConfirm.replace('{userId}', userId))) {
       try {
         // TODO: Replace with actual API endpoint
         await axios.delete(`/api/users/${userId}`)
         loadUsers()
+        alert(t.userDeleteSuccess)
       } catch (error) {
         console.error('Failed to delete user:', error)
-        alert('사용자 삭제에 실패했습니다.')
+        alert(t.userDeleteFail)
       }
     }
   }
 
   const handlePasswordReset = async (userId) => {
-    if (window.confirm(`사용자 '${userId}'의 비밀번호를 초기화하시겠습니까?`)) {
+    if (window.confirm(t.userPasswordResetConfirm.replace('{userId}', userId))) {
       try {
         // TODO: Replace with actual API endpoint
         await axios.post(`/api/users/${userId}/reset-password`)
-        alert('비밀번호가 초기화되었습니다.')
+        alert(t.userPasswordResetSuccess)
       } catch (error) {
         console.error('Failed to reset password:', error)
-        alert('비밀번호 초기화에 실패했습니다.')
+        alert(t.userPasswordResetFail)
       }
     }
   }
@@ -113,9 +118,10 @@ const UserManagement = ({ isOpen, onClose }) => {
       setIsAddingNew(false)
       setEditingUser(null)
       loadUsers()
+      alert(t.userSaveSuccess)
     } catch (error) {
       console.error('Failed to save user:', error)
-      alert('사용자 저장에 실패했습니다.')
+      alert(t.userSaveFail)
     }
   }
 
@@ -129,7 +135,7 @@ const UserManagement = ({ isOpen, onClose }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       <div className="w-[800px] mx-auto">
-        <h2 className="text-xl font-bold text-white mb-6">사용자 관리</h2>
+        <h2 className="text-xl font-bold text-white mb-6">{t.userMgmtTitle}</h2>
         
         {/* Search and Add Button */}
         <div className="flex gap-2 mb-4">
@@ -138,7 +144,7 @@ const UserManagement = ({ isOpen, onClose }) => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="사용자 검색..."
+              placeholder={t.userSearchPlaceholder}
               className="w-full p-2 pr-10 rounded bg-slate-700 text-white border border-slate-600 focus:outline-none focus:border-blue-500 text-sm"
             />
             <svg className="h-5 w-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -148,7 +154,7 @@ const UserManagement = ({ isOpen, onClose }) => {
           <button
             onClick={handleAdd}
             className="p-2 bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
-            title="사용자 추가"
+            title={t.userAdd}
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -162,11 +168,11 @@ const UserManagement = ({ isOpen, onClose }) => {
             <table className="w-full">
               <thead className="bg-slate-700 sticky top-0">
                 <tr>
-                  <th className="px-4 py-2 text-left text-slate-200 text-sm">아이디</th>
-                  <th className="px-4 py-2 text-left text-slate-200 text-sm">이름</th>
-                  <th className="px-4 py-2 text-left text-slate-200 text-sm">권한</th>
-                  <th className="px-4 py-2 text-left text-slate-200 text-sm">레벨</th>
-                  <th className="px-4 py-2 text-center text-slate-200 text-sm">작업</th>
+                  <th className="px-4 py-2 text-left text-slate-200 text-sm">{t.userIdLabel}</th>
+                  <th className="px-4 py-2 text-left text-slate-200 text-sm">{t.userNameLabel}</th>
+                  <th className="px-4 py-2 text-left text-slate-200 text-sm">{t.userAuthLabel}</th>
+                  <th className="px-4 py-2 text-left text-slate-200 text-sm">{t.userLevelLabel}</th>
+                  <th className="px-4 py-2 text-center text-slate-200 text-sm">{t.userActionsLabel}</th>
                 </tr>
               </thead>
               <tbody>
@@ -181,7 +187,7 @@ const UserManagement = ({ isOpen, onClose }) => {
                         <button
                           onClick={() => handleEdit(user)}
                           className="p-2 hover:bg-blue-600 text-blue-400 hover:text-white rounded transition-colors"
-                          title="수정"
+                          title={t.userEdit}
                         >
                           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -190,7 +196,7 @@ const UserManagement = ({ isOpen, onClose }) => {
                         <button
                           onClick={() => handleDelete(user.user)}
                           className="p-2 hover:bg-red-600 text-red-400 hover:text-white rounded transition-colors"
-                          title="삭제"
+                          title={t.userDelete}
                         >
                           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -199,7 +205,7 @@ const UserManagement = ({ isOpen, onClose }) => {
                         <button
                           onClick={() => handlePasswordReset(user.user)}
                           className="p-2 hover:bg-yellow-600 text-yellow-400 hover:text-white rounded transition-colors"
-                          title="비밀번호 초기화"
+                          title={t.userPasswordReset}
                         >
                           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
@@ -218,11 +224,11 @@ const UserManagement = ({ isOpen, onClose }) => {
         {(isAddingNew || editingUser) && (
           <div className="bg-slate-700 p-4 rounded-lg mb-4">
             <h3 className="text-base font-semibold text-white mb-4">
-              {isAddingNew ? '새 사용자 추가' : '사용자 수정'}
+              {isAddingNew ? t.userAddNew : t.userEditTitle}
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-slate-300 mb-2 text-sm">아이디</label>
+                <label className="block text-slate-300 mb-2 text-sm">{t.userIdLabel}</label>
                 <input
                   type="text"
                   value={formData.user}
@@ -232,7 +238,7 @@ const UserManagement = ({ isOpen, onClose }) => {
                 />
               </div>
               <div>
-                <label className="block text-slate-300 mb-2 text-sm">이름</label>
+                <label className="block text-slate-300 mb-2 text-sm">{t.userNameLabel}</label>
                 <input
                   type="text"
                   value={formData.user_nm}
@@ -241,23 +247,23 @@ const UserManagement = ({ isOpen, onClose }) => {
                 />
               </div>
               <div>
-                <label className="block text-slate-300 mb-2 text-sm">비밀번호</label>
+                <label className="block text-slate-300 mb-2 text-sm">{t.userPasswordLabel}</label>
                 <input
                   type="password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder={isAddingNew ? '' : '(변경시만 입력)'}
+                  placeholder={isAddingNew ? '' : t.userPasswordPlaceholder}
                   className="w-full p-2 rounded bg-slate-600 text-white border border-slate-500 focus:outline-none focus:border-blue-500 text-sm"
                 />
               </div>
               <div>
-                <label className="block text-slate-300 mb-2 text-sm">권한</label>
+                <label className="block text-slate-300 mb-2 text-sm">{t.userAuthLabel}</label>
                 <select
                   value={formData.auth}
                   onChange={(e) => setFormData({ ...formData, auth: e.target.value })}
                   className="w-full p-2 rounded bg-slate-600 text-white border border-slate-500 focus:outline-none focus:border-blue-500 text-sm"
                 >
-                  <option value="">선택하세요</option>
+                  <option value="">{t.userAuthSelectPlaceholder}</option>
                   {authOptions.map((option) => (
                     <option key={option.auth} value={option.auth}>
                       {option.auth_nm} ({option.auth})
@@ -266,13 +272,19 @@ const UserManagement = ({ isOpen, onClose }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-slate-300 mb-2 text-sm">레벨</label>
-                <input
-                  type="number"
+                <label className="block text-slate-300 mb-2 text-sm">{t.userLevelLabel}</label>
+                <select
                   value={formData.level}
                   onChange={(e) => setFormData({ ...formData, level: e.target.value })}
                   className="w-full p-2 rounded bg-slate-600 text-white border border-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-                />
+                >
+                  <option value="">{t.userAuthSelectPlaceholder}</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="flex gap-2 mt-4">
@@ -280,13 +292,13 @@ const UserManagement = ({ isOpen, onClose }) => {
                 onClick={handleSave}
                 className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors text-sm"
               >
-                저장
+                {t.save}
               </button>
               <button
                 onClick={handleCancel}
                 className="flex-1 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded transition-colors text-sm"
               >
-                취소
+                {t.cancel}
               </button>
             </div>
           </div>
@@ -298,7 +310,7 @@ const UserManagement = ({ isOpen, onClose }) => {
             onClick={onClose}
             className="px-6 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded transition-colors text-sm"
           >
-            닫기
+            {t.close}
           </button>
         </div>
       </div>

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import Modal from './Modal'
 import axios from 'axios'
+import translations from '../translation'
 
-const InfoManagement = ({ isOpen, onClose }) => {
+const InfoManagement = ({ isOpen, onClose, language = 'ko' }) => {
   const [infos, setInfos] = useState([]) // each info: { table_nm, table_alias }
   const [selectedInfo, setSelectedInfo] = useState(null) // selected info object
   const [columns, setColumns] = useState([])
@@ -20,7 +21,8 @@ const InfoManagement = ({ isOpen, onClose }) => {
     level: '',
     description: ''
   })
-
+  // Use language from props
+  const t = translations[language]
   useEffect(() => {
     if (isOpen) {
       loadInfos()
@@ -79,12 +81,12 @@ const InfoManagement = ({ isOpen, onClose }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-[1200px]">
       <div className="w-full">
-        <h2 className="text-xl font-bold text-white mb-6">정보 관리</h2>
+        <h2 className="text-xl font-bold text-white mb-6">{t.infoMgmtTitle}</h2>
 
         <div className="flex gap-4">
           {/* Left Panel - Info List */}
           <div className="w-1/2">
-            <h3 className="text-base font-semibold text-white mb-4">정보 목록</h3>
+            <h3 className="text-base font-semibold text-white mb-4">{t.infoListTitle}</h3>
 
             {/* Info Grid */}
             <div className="bg-slate-800 rounded-lg overflow-hidden mb-4">
@@ -92,8 +94,8 @@ const InfoManagement = ({ isOpen, onClose }) => {
                 <table className="w-full">
                   <thead className="bg-slate-700 sticky top-0">
                     <tr>
-                      <th className="px-3 py-2 text-center text-slate-200 text-sm">테이블명</th>
-                      <th className="px-3 py-2 text-center text-slate-200 text-sm">테이블별칭</th>
+                      <th className="px-3 py-2 text-center text-slate-200 text-sm">{t.tableNameLabel}</th>
+                      <th className="px-3 py-2 text-center text-slate-200 text-sm">{t.tableAliasLabel}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -118,7 +120,7 @@ const InfoManagement = ({ isOpen, onClose }) => {
           <div className="w-1/2">
             <div className="mb-4">
               <h3 className="text-base font-semibold text-white">
-                칼럼 정보 {selectedInfo && `- ${selectedInfo.table_alias}`}
+                {t.columnInfoTitle} {selectedInfo && `- ${selectedInfo.table_alias}`}
               </h3>
             </div>
 
@@ -128,9 +130,9 @@ const InfoManagement = ({ isOpen, onClose }) => {
                 <table className="w-full">
                   <thead className="bg-slate-700 sticky top-0">
                     <tr>
-                      <th className="px-3 py-2 text-center text-slate-200 text-sm">칼럼코드</th>
-                      <th className="px-3 py-2 text-center text-slate-200 text-sm">칼럼명</th>
-                      <th className="px-3 py-2 text-center text-slate-200 text-sm">레벨</th>
+                      <th className="px-3 py-2 text-center text-slate-200 text-sm">{t.columnCodeLabel}</th>
+                      <th className="px-3 py-2 text-center text-slate-200 text-sm">{t.columnNameLabel}</th>
+                      <th className="px-3 py-2 text-center text-slate-200 text-sm">{t.columnLevelLabel}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -162,7 +164,7 @@ const InfoManagement = ({ isOpen, onClose }) => {
                             }}
                             className="w-16 p-1 text-center rounded bg-slate-600 text-white border border-slate-500 focus:outline-none focus:border-blue-500 text-sm"
                           >
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => (
+                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => (
                               <option key={level} value={level}>{level}</option>
                             ))}
                           </select>
@@ -182,7 +184,7 @@ const InfoManagement = ({ isOpen, onClose }) => {
             onClick={onClose}
             className="px-6 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded transition-colors text-sm"
           >
-            닫기
+            {t.close}
           </button>
         </div>
       </div>
