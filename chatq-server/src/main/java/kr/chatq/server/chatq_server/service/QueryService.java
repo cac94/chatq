@@ -824,7 +824,9 @@ public class QueryService {
         session.setAttribute("INFO_COLUMNS", infoColumns);
 
         String company = CompanyContext.getCompany();
-        embeddingService.checkMemeDB(company);
+        if(useEmbedding){
+            embeddingService.checkMemeDB(company);
+        }
         // 4) 로그인 성공 응답 반환
         return new LoginResponse(
                 "SUCCESS",
