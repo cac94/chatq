@@ -44,15 +44,25 @@ public class DbService {
 
     // chatqtable 테이블에서 table 정보 조회
     public List<Map<String, Object>> getTables(String auth, String metaYn) {
-        if (auth == null || auth.isEmpty()) {
-            return List.of();
-        }
-
         String company = CompanyContext.getCompany();
-        String sql = "SELECT a.* FROM chatqtable a INNER JOIN chatqauth b ON (a.table_nm = b.table_nm) WHERE a.company = ? AND b.company = ? AND b.auth = ? and a.meta_yn = ?";
-        logger.info("Executing SQL: {} with params: [{}, {}, {}, {}]", sql, company, company, auth, metaYn);
-        System.out.println("[DbService] Executing SQL: " + sql + " with params: [" + company + ", " + company + ", "
-                + auth + ", " + metaYn + "]");
+        String sql;
+        Object[] params;
+
+        if (auth == null || auth.isEmpty()) {
+            // auth가 비어있으면 모든 auth에 대해 조회
+            sql = "SELECT a.* FROM chatqtable a WHERE a.company = ? and a.meta_yn = ?";
+            params = new Object[]{company, metaYn};
+            logger.info("Executing SQL: {} with params: [{}, {}, {}]", sql, company, company, metaYn);
+            System.out.println("[DbService] Executing SQL: " + sql + " with params: [" + company + ", " + company + ", "
+                    + metaYn + "]");
+        } else {
+            // auth가 있으면 특정 auth만 조회
+            sql = "SELECT a.* FROM chatqtable a INNER JOIN chatqauth b ON (a.table_nm = b.table_nm) WHERE a.company = ? AND b.company = ? AND b.auth = ? and a.meta_yn = ?";
+            params = new Object[]{company, company, auth, metaYn};
+            logger.info("Executing SQL: {} with params: [{}, {}, {}, {}]", sql, company, company, auth, metaYn);
+            System.out.println("[DbService] Executing SQL: " + sql + " with params: [" + company + ", " + company + ", "
+                    + auth + ", " + metaYn + "]");
+        }
 
         return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Map<String, Object> row = new HashMap<>();
@@ -64,7 +74,7 @@ public class DbService {
                 row.put(columnName, rs.getObject(columnName));
             }
             return row;
-        }, company, company, auth, metaYn);
+        }, params);
     }
 
     // chatqcolumn 테이블에서 table_nm 칼럼이 tableNm인 것을 조회

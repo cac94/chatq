@@ -284,11 +284,12 @@ public class QueryService {
 
             if (tableAlias == null || tableAlias.isEmpty()) {
                 if (useEmbedding) {
-                    String auth = getAuth();
-                    var searchResults = embeddingService.search(auth, message, 1);
+                    String company = CompanyContext.getCompany();
+                    List<String> infoKeys = new ArrayList<>(infos.keySet());
+                    var searchResults = embeddingService.search(company, message, 1, infoKeys);
                     if (searchResults != null && !searchResults.isEmpty()) {
                         tableAlias = searchResults.get(0).getKey();
-                        logger.info("Table selected via embedding for auth {}: {}", auth, tableAlias);
+                        logger.info("Table selected via embedding for company {}: {}", company, tableAlias);
                     }
                 }
 
@@ -392,24 +393,17 @@ public class QueryService {
     }
 
     public void initMemDb() {
-        String auth = getAuth();
-        initMemDb(auth);
-    }
-
-    public void initMemDbAllAuths() {
-        List<AuthDto> auths = getAuths();
-        for (AuthDto auth : auths) {
-            initMemDb(auth.getAuth());
-        }
+        String company = CompanyContext.getCompany();
+        initMemDb(company);
     }
 
     @SuppressWarnings("unchecked")
-    public void initMemDb(String auth) {
-        embeddingService.clear(auth);
+    public void initMemDb(String company) {
+        embeddingService.clear(company);
         try {
-            Map<String, Object> result = promptMakerService.getPickTablePrompt(auth, "initMemDb", 1);
+            Map<String, Object> result = promptMakerService.getPickTablePrompt("", "initMemDb", 1);
             List<Map<String, Object>> tables = (List<Map<String, Object>>) result.get("tables");
-            logger.info("Initializing memory DB for auth {} with {} tables", auth, tables.size());
+            logger.info("Initializing memory DB for company {} with {} tables", company, tables.size());
             for (Map<String, Object> table : tables) {
                 String tableAlias = table.get("table_alias") != null ? table.get("table_alias").toString() : "";
                 String keywords = table.get("keywords") != null ? table.get("keywords").toString() : "";
@@ -430,16 +424,16 @@ public class QueryService {
                 }
 
                 List<Double> vector = embeddingService.embed(textToEmbed);
-                embeddingService.save(auth, tableAlias, vector);
+                embeddingService.save(company, tableAlias, vector);
             }
         } catch (SQLException e) {
-            logger.error("Error in initMemDb for auth {}: {}", auth, e.getMessage(), e);
+            logger.error("Error in initMemDb for company {}: {}", company, e.getMessage(), e);
         }
     }
 
     public QueryResponse executeNewChat() {
-        String auth = getAuth();
-        String conversationId = auth + "_" + System.currentTimeMillis();
+        String company = CompanyContext.getCompany();
+        String conversationId = company + "_" + System.currentTimeMillis();
 
         QueryResponse response = new QueryResponse();
         response.setMessage("New chat session started: " + conversationId);
@@ -829,6 +823,8 @@ public class QueryService {
         session.setAttribute("INFOS", infos);
         session.setAttribute("INFO_COLUMNS", infoColumns);
 
+        String company = CompanyContext.getCompany();
+        embeddingService.checkMemeDB(company);
         // 4) 로그인 성공 응답 반환
         return new LoginResponse(
                 "SUCCESS",
@@ -1059,8 +1055,6 @@ public class QueryService {
                 jdbcTemplate.update(authSql, auth.getAuth(), info.trim(), company);
             }
         }
-
-        initMemDb(auth.getAuth());
     }
 
     /**
@@ -1090,8 +1084,6 @@ public class QueryService {
                 jdbcTemplate.update(authSql, authId, info.trim(), addDate, addTime, currentUser, company);
             }
         }
-
-        initMemDb(auth.getAuth());
     }
 
     /**

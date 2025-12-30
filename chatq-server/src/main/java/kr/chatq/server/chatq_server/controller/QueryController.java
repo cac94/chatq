@@ -121,17 +121,6 @@ public class QueryController {
         }
     }
 
-    @GetMapping("/initmemdballauths")
-    public ResponseEntity<String> initMemDbAllAuths() {
-        try {
-            queryService.initMemDbAllAuths();
-            return ResponseEntity.ok("Memory DB initialized successfully");
-        } catch (Exception e) {
-            logger.error("Error initializing memory DB", e);
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
-        }
-    }
-
     @GetMapping("/check-session")
     public ResponseEntity<LoginResponse> checkSession(HttpSession session) {
         LoginResponse response = queryService.checkSession(session);

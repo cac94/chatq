@@ -93,6 +93,22 @@ public class EmbeddingService {
     }
 
     public List<Map.Entry<String, Double>> search(String dbName, String queryText, int topN) {
+        return search(dbName, queryText, topN, null);
+    }
+
+    public void checkMemeDB(String dbName) {
+        if ((!storage.containsKey(dbName) || storage.get(dbName).isEmpty()) && initializer != null) {
+            if (initializing.compareAndSet(false, true)) {
+                try {
+                    initializer.run();
+                } finally {
+                    initializing.set(false);
+                }
+            }
+        }
+    }
+
+    public List<Map.Entry<String, Double>> search(String dbName, String queryText, int topN, List<String> keyFilter) {
         if ((!storage.containsKey(dbName) || storage.get(dbName).isEmpty()) && initializer != null) {
             if (initializing.compareAndSet(false, true)) {
                 try {
@@ -107,6 +123,7 @@ public class EmbeddingService {
         List<Double> queryVector = embed(queryText);
 
         return dbStorage.entrySet().stream()
+                .filter(entry -> keyFilter == null || keyFilter.isEmpty() || keyFilter.contains(entry.getKey()))
                 .map(entry -> new AbstractMap.SimpleEntry<>(
                         entry.getKey(),
                         cosineSimilarity(queryVector, entry.getValue())))
