@@ -48,7 +48,8 @@ public class PromptMakerService {
             // table 정보로 getColumns 호출
             String tableName = table.get("table_nm").toString();
             String tableAlias = table.get("table_alias").toString();
-            String tailQuery = table.get("tail_query").toString();
+            tableAlias = tableAlias.isEmpty() ? tableName : tableAlias;
+            String tailQuery = table.get("tail_query") != null ? table.get("tail_query").toString() : "";
             tableAliasList.add("`__" + tableAlias + "__`");
 
             promptBuilder.append("\"__").append(tableAlias).append("__\": \"select ");
