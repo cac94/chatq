@@ -46,8 +46,10 @@ const App = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmCallback, setConfirmCallback] = useState(null)
   const [confirmMessage, setConfirmMessage] = useState('')
+  const [isListening, setIsListening] = useState(false)
   const bottomRef = useRef(null)
   const inputContainerRef = useRef(null)
+  const recognitionRef = useRef(null)
   const qurl = '/api/chatq' // Your API endpoint
 
   // Store lastQuery and tableQuery from previous response
@@ -251,6 +253,165 @@ const App = () => {
     handleSend(session.firstQuery, newId, true, session.tableAlias)
   }
 
+  const handleVoiceInput = () => {
+    // Web Speech API 지원 확인
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    
+    if (!SpeechRecognition) {
+      setAlertMessage(translations[language].speechNotSupported || '음성 인식이 지원되지 않는 브라우저입니다.')
+      setShowAlert(true)
+      return
+    }
+
+    if (isListening) {
+      // 청취 중지
+      console.log('🛑 음성 인식 중지')
+      if (recognitionRef.current) {
+        recognitionRef.current.stop()
+      }
+      setIsListening(false)
+      return
+    }
+
+    // 즉시 음성 인식 시작
+    startVoiceRecognition()
+  }
+
+  const startVoiceRecognition = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    
+    console.log('🎯 음성 인식 시작 준비')
+    const recognition = new SpeechRecognition()
+    recognition.lang = language === 'ko' ? 'ko-KR' : 'en-US'
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.maxAlternatives = 1
+
+    let finalTranscript = ''
+    let isProcessing = false
+    let speechDetected = false
+    let audioDetected = false
+
+    recognition.onstart = () => {
+      console.log('🎤 음성 인식 활성화!')
+      console.log('%c🔴 지금 바로 크게 말씀하세요! 🔴', 'color: white; font-size: 24px; font-weight: bold; background: red; padding: 10px;')
+      setIsListening(true)
+    }
+
+    recognition.onspeechstart = () => {
+      console.log('🗣️ 음성 감지됨!')
+      speechDetected = true
+    }
+
+    recognition.onspeechend = () => {
+      console.log('🤐 음성 종료')
+    }
+
+    recognition.onaudiostart = () => {
+      console.log('🔊 오디오 입력 감지 시작')
+      audioDetected = true
+      console.log('%c마이크가 작동 중입니다. 지금 말씀하세요!', 'color: green; font-size: 16px; font-weight: bold;')
+    }
+
+    recognition.onaudioend = () => {
+      console.log('🔇 오디오 입력 종료')
+      if (!speechDetected && audioDetected) {
+        console.log('⚠️ 경고: 오디오는 감지되었으나 음성은 감지되지 않음 - 더 크게 말씀하세요!')
+      }
+    }
+
+    recognition.onaudiostart = () => {
+      console.log('🔊 오디오 입력 감지 시작')
+    }
+
+    recognition.onaudioend = () => {
+      console.log('🔇 오디오 입력 종료')
+    }
+
+    recognition.onresult = (event) => {
+      console.log('📝 음성 인식 결과 수신:', event.results)
+      
+      let interimTranscript = ''
+      
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + ' '
+          console.log('✅ 최종 결과:', transcript)
+        } else {
+          interimTranscript += transcript
+          console.log('⏳ 중간 결과:', transcript)
+        }
+      }
+      
+      // 입력창에 표시 (최종 + 중간 결과)
+      const displayText = (finalTranscript + interimTranscript).trim()
+      setQuery(displayText)
+      console.log('📄 입력창 업데이트:', displayText)
+      
+      // 최종 결과가 있고 아직 처리 중이 아니면 자동 전송 준비
+      if (finalTranscript.trim() && !isProcessing) {
+        console.log('🚀 최종 결과 확정 - 2초 후 자동 전송 예정')
+        isProcessing = true
+        
+        // 2초 후에도 추가 음성이 없으면 전송
+        setTimeout(() => {
+          if (recognitionRef.current) {
+            console.log('🛑 음성 인식 중지 (자동)')
+            recognitionRef.current.stop()
+          }
+          const textToSend = finalTranscript.trim()
+          console.log('📤 질의 전송:', textToSend)
+          handleSend(textToSend)
+        }, 2000)
+      }
+    }
+
+    recognition.onerror = (event) => {
+      console.error('❌ 음성 인식 오류:', event.error)
+      console.log('오류 상세:', event)
+      setIsListening(false)
+      
+      if (event.error === 'no-speech') {
+        if (!speechDetected) {
+          setAlertMessage('음성이 감지되지 않았습니다.\n\n확인사항:\n1. 마이크가 제대로 연결되어 있나요?\n2. 마이크 버튼을 누른 직후 바로 말씀하세요\n3. 브라우저 주소창 옆 마이크 아이콘을 확인하세요\n4. 시스템 설정에서 마이크가 활성화되어 있나요?')
+        } else {
+          // 음성은 감지되었지만 no-speech 오류 발생 - 일시적 문제일 수 있음
+          console.log('⚠️ 음성은 감지되었으나 no-speech 오류 발생 (무시)')
+          return
+        }
+        setShowAlert(true)
+      } else if (event.error === 'audio-capture') {
+        setAlertMessage('마이크에 접근할 수 없습니다.\n\n마이크가 연결되어 있고\n다른 앱에서 사용 중이지 않은지 확인해주세요.')
+        setShowAlert(true)
+      } else if (event.error === 'not-allowed') {
+        setAlertMessage('마이크 권한이 거부되었습니다.\n\n브라우저 설정(주소창 옆 자물쇠 아이콘)에서\n마이크 권한을 허용해주세요.')
+        setShowAlert(true)
+      } else if (event.error !== 'aborted') {
+        setAlertMessage(`음성 인식 오류: ${event.error}\n\n다시 시도해주세요.`)
+        setShowAlert(true)
+      }
+    }
+
+    recognition.onend = () => {
+      console.log('🔚 음성 인식 세션 종료')
+      setIsListening(false)
+      recognitionRef.current = null
+    }
+
+    recognitionRef.current = recognition
+    try {
+      recognition.start()
+      console.log('✨ recognition.start() 호출 성공!')
+      console.log('💡 팁: 마이크 버튼이 빨간색으로 깜박이는 동안 말씀하세요')
+    } catch (error) {
+      console.error('💥 음성 인식 시작 실패:', error)
+      setAlertMessage('음성 인식을 시작할 수 없습니다.\n\n페이지를 새로고침 후 다시 시도해주세요.')
+      setShowAlert(true)
+      setIsListening(false)
+    }
+  }
+
   const handleChartPromptSubmit = async (prompt, chartType) => {
     console.log('Chart Prompt:', prompt, 'Chart Type:', chartType, 'Grid ID:', activeGridForChart)
 
@@ -427,9 +588,26 @@ const App = () => {
                   }
                 }}
                 placeholder={translations[language].inputPlaceholder}
-                className="w-full p-3 pl-12 pr-12 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 focus:outline-none focus:border-slate-500 appearance-none !bg-slate-800 !text-slate-200 !border-slate-700"
+                className="w-full p-3 pl-12 pr-24 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 focus:outline-none focus:border-slate-500 appearance-none !bg-slate-800 !text-slate-200 !border-slate-700"
                 autoComplete="off"
               />
+              <button
+                onClick={handleVoiceInput}
+                className={`absolute right-12 top-1/2 -translate-y-1/2 p-2 rounded-md transition-all ${
+                  isListening 
+                    ? 'text-red-500 bg-red-500/20 animate-pulse' 
+                    : 'text-slate-400 hover:text-slate-300 hover:bg-slate-700'
+                }`}
+                aria-label="Voice Input"
+                title={isListening ? (translations[language].stopListening || '청취 중지') : (translations[language].voiceInput || '음성 입력')}
+              >
+                <svg className={`h-5 w-5 ${isListening ? 'scale-110' : ''} transition-transform`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+                {isListening && (
+                  <span className="absolute inset-0 rounded-md bg-red-500/30 animate-ping"></span>
+                )}
+              </button>
               <button
                 onClick={() => handleSend()}
                 disabled={isLoading}
