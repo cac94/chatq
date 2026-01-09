@@ -252,7 +252,8 @@ const App = () => {
           }))
           : []
 
-        setGrids(prevGrids => [...prevGrids, {
+        // 새로 생성된 그리드 객체 저장
+        const newGrid = {
           id: Date.now(),
           query: effectivePrompt,
           data: response.data.data,
@@ -261,7 +262,9 @@ const App = () => {
           headerData: response.data.headerData,
           detailYn: response.data.detailYn,
           showDetail: false
-        }])
+        }
+        
+        setGrids(prevGrids => [...prevGrids, newGrid])
 
         // Set firstQuery and tableAlias for session if absent (supports replay where session id provided directly)
         const targetSessionId = sessionIdForFirstQuery !== null ? sessionIdForFirstQuery : currentSessionId
@@ -288,6 +291,8 @@ const App = () => {
 
         // Clear input only if not a replay (avoid flashing same text before send)
         setQuery('')
+        
+        return newGrid
       } catch (error) {
         console.error('API Error:', error)
         setAlertMessage(translations[language].apiError)
@@ -309,6 +314,26 @@ const App = () => {
       setSelectedInfo(session.tableAlias)
     }
     handleSend(session.firstQuery, newId, true, session.tableAlias)
+  }
+
+  // 차트 생성 공통 함수
+  const generateChart = async (payload, gridId) => {
+    setIsLoading(true)
+    try {
+      const response = await axios.post('/api/chart', payload)
+      const chartData = response.data
+
+      setChartResult(chartData)
+      setActiveChartType(payload.chartType)
+      setActiveGridForChart(gridId)
+      setShowChartResultModal(true)
+    } catch (error) {
+      console.error('Chart generation failed:', error)
+      setAlertMessage(translations[language].chartError || 'Failed to generate chart. Please try again.')
+      setShowAlert(true)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleVoiceInput = () => {
@@ -474,34 +499,48 @@ const App = () => {
     console.log('Chart Prompt:', prompt, 'Chart Type:', chartType, 'Grid ID:', activeGridForChart)
 
     const grid = grids.find(g => g.id === activeGridForChart)
-    if (!grid) return
+    if (!grid) {
+      console.error('Grid not found for ID:', activeGridForChart)
+      return
+    }
 
-    // Prepare payload
+    // prompt가 공백이 아니면 새 쿼리 실행 후 차트 생성
+    if (prompt && prompt.trim()) {
+      const combinedQuery = `${grid.query} ${prompt}`
+      console.log('Combined query:', combinedQuery)
+      setShowChartModal(false)
+      
+      const newGrid = await handleSend(combinedQuery)
+      console.log('New grid received from handleSend:', newGrid)
+      
+      if (newGrid) {
+        console.log('Using new grid data - columns:', newGrid.columns.length, 'rows:', newGrid.data.length)
+        const payload = {
+          prompt: prompt,
+          chartType,
+          columns: newGrid.columns,
+          data: newGrid.data
+        }
+        console.log('Payload for chart generation:', { chartType, columnsCount: payload.columns.length, dataRowCount: payload.data.length })
+        await generateChart(payload, newGrid.id)
+      } else {
+        console.error('handleSend did not return newGrid')
+        setAlertMessage(translations[language].apiError || 'Failed to create new query result')
+        setShowAlert(true)
+      }
+      return
+    }
+
+    // prompt가 없으면 기존 그리드로 차트 생성
+    console.log('Using existing grid data - columns:', grid.columns.length, 'rows:', grid.data.length)
+    setShowChartModal(false)
     const payload = {
-      prompt,
+      prompt: '',
       chartType,
       columns: grid.columns,
       data: grid.data
     }
-
-    setIsLoading(true)
-    setShowChartModal(false)
-
-    try {
-      const response = await axios.post('/api/chart', payload)
-      const chartData = response.data
-
-      setChartResult(chartData)
-      setActiveChartType(chartType)
-      setShowChartResultModal(true)
-
-    } catch (error) {
-      console.error('Chart generation failed:', error)
-      setAlertMessage(translations[language].chartError || 'Failed to generate chart. Please try again.')
-      setShowAlert(true)
-    } finally {
-      setIsLoading(false)
-    }
+    await generateChart(payload, grid.id)
   }
 
   useEffect(() => {
