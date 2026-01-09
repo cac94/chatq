@@ -65,6 +65,8 @@ const App = () => {
   const [sessions, setSessions] = useState([]) // { id, firstQuery, tableAlias, startedAt }
   const [currentSessionId, setCurrentSessionId] = useState(null)
   const [selectedInfo, setSelectedInfo] = useState('')
+  const [autoLogoutSec, setAutoLogoutSec] = useState(0)
+  const autoLogoutTimerRef = useRef(null)
 
   const handleResetSession = () => {
     setGrids([])
@@ -86,6 +88,61 @@ const App = () => {
     setGrids(prevGrids => prevGrids.map(grid =>
       grid.id === gridId ? { ...grid, showDetail: !grid.showDetail } : grid
     ))
+  }
+
+  // 로그아웃 처리 함수
+  const handleLogout = async (isAutoLogout = false) => {
+    try {
+      await axios.post('/api/logout')
+      setAuth(null)
+      setUser(null)
+      setInfos(null)
+      setInfoColumns(null)
+      setLevel(null)
+      setUserNm(null)
+      setGrids([])
+      setLastQuery(null)
+      setTableQuery(null)
+      setLastDetailYn(null)
+      setTableName(null)
+      setTableAlias(null)
+      setHeaderColumns(null)
+      setLastColumns(null)
+      setSessions([])
+      setCurrentSessionId(null)
+      setSelectedInfo('')
+      setAutoLogoutSec(0)
+      if (autoLogoutTimerRef.current) {
+        clearTimeout(autoLogoutTimerRef.current)
+      }
+      setShowUserInfoModal(false)
+      
+      if (isAutoLogout) {
+        setAlertMessage(translations[language].autoLogout)
+      } else {
+        setAlertMessage(translations[language].logoutSuccess)
+      }
+      setShowAlert(true)
+    } catch (error) {
+      console.error('Logout Error:', error)
+      if (!isAutoLogout) {
+        setAlertMessage(translations[language].logoutError)
+        setShowAlert(true)
+      }
+    }
+  }
+
+  // 자동 로그아웃 타이머 초기화 함수
+  const resetAutoLogoutTimer = () => {
+    if (autoLogoutTimerRef.current) {
+      clearTimeout(autoLogoutTimerRef.current)
+    }
+
+    if (autoLogoutSec > 0 && user) {
+      autoLogoutTimerRef.current = setTimeout(() => {
+        handleLogout(true)
+      }, autoLogoutSec * 1000)
+    }
   }
 
   const handleLogin = async (e) => {
@@ -116,6 +173,7 @@ const App = () => {
       // 사용자 아이디 저장 (우선 서버 응답, 없으면 입력값 사용)
       setUser(response.data.user || username)
       setSelectedInfo('')
+      setAutoLogoutSec(response.data.autoLogoutSec || 0)
 
       setShowLoginModal(false)
       // 비밀번호 초기화 상태면 안내 메시지와 함께 사용자정보 모달 오픈
@@ -465,6 +523,7 @@ const App = () => {
           setLevel(response.data.level || 9)
           setUserNm(response.data.user_nm || null)
           setUser(response.data.user)
+          setAutoLogoutSec(response.data.autoLogoutSec || 0)
         }
       } catch (error) {
         console.log('No active session')
@@ -489,6 +548,33 @@ const App = () => {
       setOpenUserInfoAfterAlert(false)
     }
   }, [showAlert, openUserInfoAfterAlert])
+
+  // 자동 로그아웃 타이머 설정 및 사용자 활동 감지
+  useEffect(() => {
+    if (autoLogoutSec > 0 && user) {
+      resetAutoLogoutTimer()
+
+      // 사용자 활동 감지 이벤트
+      const handleUserActivity = () => {
+        resetAutoLogoutTimer()
+      }
+
+      window.addEventListener('mousemove', handleUserActivity)
+      window.addEventListener('keydown', handleUserActivity)
+      window.addEventListener('click', handleUserActivity)
+      window.addEventListener('scroll', handleUserActivity)
+
+      return () => {
+        window.removeEventListener('mousemove', handleUserActivity)
+        window.removeEventListener('keydown', handleUserActivity)
+        window.removeEventListener('click', handleUserActivity)
+        window.removeEventListener('scroll', handleUserActivity)
+        if (autoLogoutTimerRef.current) {
+          clearTimeout(autoLogoutTimerRef.current)
+        }
+      }
+    }
+  }, [autoLogoutSec, user])
 
   return (
     <div className="flex flex-col h-screen bg-slate-900">
@@ -874,35 +960,7 @@ const App = () => {
         infos={infos ? infos.join(', ') : ''}
         language={language}
         translations={translations}
-        onLogout={async () => {
-          try {
-            await axios.post('/api/logout')
-            setAuth(null)
-            setUser(null)
-            setInfos(null)
-            setInfoColumns(null)
-            setLevel(null)
-            setUserNm(null)
-            setGrids([])
-            setLastQuery(null)
-            setTableQuery(null)
-            setLastDetailYn(null)
-            setTableName(null)
-            setTableAlias(null)
-            setHeaderColumns(null)
-            setLastColumns(null)
-            setSessions([])
-            setCurrentSessionId(null)
-            setSelectedInfo('')
-            setShowUserInfoModal(false)
-            setAlertMessage(translations[language].logoutSuccess)
-            setShowAlert(true)
-          } catch (error) {
-            console.error('Logout Error:', error)
-            setAlertMessage(translations[language].logoutError)
-            setShowAlert(true)
-          }
-        }}
+        onLogout={() => handleLogout(false)}
       />
 
       {/* User Management Modal */}

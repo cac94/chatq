@@ -12,11 +12,12 @@ public class LoginResponse {
     private String user_nm;   // 사용자 이름
     private String pwdFiredYn;
     private Map<String, List<String>> infoColumns;
+    private int autoLogoutSec;
 
     public LoginResponse() {
     }
 
-    public LoginResponse(String message, String auth, List<String> infos, int level, String user, String user_nm, String pwdFiredYn, Map<String, List<String>> infoColumns) {
+    public LoginResponse(String message, String auth, List<String> infos, int level, String user, String user_nm, String pwdFiredYn, Map<String, List<String>> infoColumns, int autoLogoutSec) {
         this.message = message;
         this.auth = auth;
         this.infos = infos;
@@ -25,6 +26,7 @@ public class LoginResponse {
         this.user_nm = user_nm;
         this.pwdFiredYn = pwdFiredYn;
         this.infoColumns = infoColumns;
+        this.autoLogoutSec = autoLogoutSec;
     }
     public String getUser() {
         return user;
@@ -88,5 +90,13 @@ public class LoginResponse {
 
     public void setInfoColumns(Map<String, List<String>> infoColumns) {
         this.infoColumns = infoColumns;
+    }
+
+    public int getAutoLogoutSec() {
+        return autoLogoutSec;
+    }
+
+    public void setAutoLogoutSec(int autoLogoutSec) {
+        this.autoLogoutSec = autoLogoutSec;
     }
 }

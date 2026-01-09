@@ -105,7 +105,7 @@ public class QueryController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Login exception for user {}: {}", request.getUser(), e.getMessage(), e);
-            LoginResponse response = new LoginResponse("FAIL", null, null, 9, null, null, null, null);
+            LoginResponse response = new LoginResponse("FAIL", null, null, 9, null, null, null, null, 0);
             return ResponseEntity.ok(response);
         }
     }

@@ -110,7 +110,7 @@ public class DbService {
     // chatquser 테이블에서 user, password 칼럼이 user, password인 것을 조회
     public List<Map<String, Object>> getUsers(String user) {
         String company = CompanyContext.getCompany();
-        String sql = "SELECT * FROM chatquser WHERE company = ? AND user = ?";
+        String sql = "select b.auto_logout_sec, a.* FROM chatquser a inner join chatqcomp b on (a.company = b.company) WHERE  a.company = ? AND a.user = ?";
         logger.info("Executing SQL: {} with params: [{}, {}]", sql, company, user);
         System.out.println("[DbService] Executing SQL: " + sql + " with params: [" + company + ", " + user + "]");
         return jdbcTemplate.query(sql, (rs, rowNum) -> {

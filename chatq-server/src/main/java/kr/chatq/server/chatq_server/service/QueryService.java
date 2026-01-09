@@ -778,7 +778,7 @@ public class QueryService {
         List<Map<String, Object>> rows = dbService.getUsers(user);
         if (rows.isEmpty()) {
             logger.warn("Login failed: User not found: {}", user);
-            return new LoginResponse("FAIL", null, null, 9, null, null, null, null);
+            return new LoginResponse("FAIL", null, null, 9, null, null, null, null, 0);
         }
 
         Map<String, Object> userInfo = rows.get(0);
@@ -786,13 +786,14 @@ public class QueryService {
         if (!user.equals("admin") && (hashedPassword == null || !matchesPwd(password, hashedPassword))) {
             // 비밀번호 불일치
             logger.warn("Login failed: Password mismatch for user: {}", user);
-            return new LoginResponse("FAIL", null, null, 9, null, null, null, null);
+            return new LoginResponse("FAIL", null, null, 9, null, null, null, null, 0);
         }
 
         logger.info("Login success for user: {}", user);
 
         String auth = (String) userInfo.get("auth");
         int level = ((Number) userInfo.get("level")).intValue();
+        int autoLogoutSec = ((Number) userInfo.get("auto_logout_sec")).intValue();
         String userName = (String) userInfo.get("user_nm");
         String pwdFiredYn = (String) userInfo.get("pwd_fired_yn");
 
@@ -820,6 +821,7 @@ public class QueryService {
         session.setAttribute("USER_NM", userName);
         session.setAttribute("AUTH", auth);
         session.setAttribute("LEVEL", level);
+        session.setAttribute("AUTO_LOGOUT_SEC", autoLogoutSec);
         session.setAttribute("INFOS", infos);
         session.setAttribute("INFO_COLUMNS", infoColumns);
 
@@ -836,7 +838,8 @@ public class QueryService {
                 user,
                 userName,
                 pwdFiredYn,
-                infoColumns);
+                infoColumns, 
+                autoLogoutSec);
     }
 
     /**
@@ -850,6 +853,7 @@ public class QueryService {
             session.removeAttribute("USER_NM");
             session.removeAttribute("AUTH");
             session.removeAttribute("LEVEL");
+            session.removeAttribute("AUTO_LOGOUT_SEC");
             session.removeAttribute("INFOS");
             session.removeAttribute("INFO_COLUMNS");
         }
@@ -1170,7 +1174,7 @@ public class QueryService {
      */
     public LoginResponse checkSession(HttpSession session) {
         if (session == null) {
-            return new LoginResponse("FAIL", null, null, 9, null, null, null, null);
+            return new LoginResponse("FAIL", null, null, 9, null, null, null, null, 0);
         }
         String user = (String) session.getAttribute("USER");
         String auth = (String) session.getAttribute("AUTH");
@@ -1179,10 +1183,11 @@ public class QueryService {
         @SuppressWarnings("unchecked")
         Map<String, List<String>> infoColumns = (Map<String, List<String>>) session.getAttribute("INFO_COLUMNS");
         Integer level = (Integer) session.getAttribute("LEVEL");
+        Integer autoLogoutSec = (Integer) session.getAttribute("AUTO_LOGOUT_SEC");
         String userName = (String) session.getAttribute("USER_NM");
         if (level == null)
             level = 9;
-        return new LoginResponse("SUCCESS", auth, infos, level, user, userName, null, infoColumns);
+        return new LoginResponse("SUCCESS", auth, infos, level, user, userName, null, infoColumns, autoLogoutSec);
     }
 
     /**
