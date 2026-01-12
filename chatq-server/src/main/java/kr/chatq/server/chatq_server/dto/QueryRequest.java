@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Map;
 
 public class QueryRequest {
+    private int id;
+    private long topic_id;
     private String prompt;
     private String conversationId;
     private String lastDetailYn;
@@ -93,5 +95,21 @@ public class QueryRequest {
 
     public void setCodeMaps(Map<String, String> codeMaps) {
         this.codeMaps = codeMaps;
+    }
+
+    public long getTopicId() {
+        return topic_id;
+    }
+
+    public void setTopicId(long topic_id) {
+        this.topic_id = topic_id;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
     }
 }

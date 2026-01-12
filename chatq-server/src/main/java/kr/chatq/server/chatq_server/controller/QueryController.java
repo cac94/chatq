@@ -10,7 +10,9 @@ import kr.chatq.server.chatq_server.dto.AuthDto;
 import kr.chatq.server.chatq_server.dto.ChartRequest;
 import kr.chatq.server.chatq_server.dto.ChartResponse;
 import kr.chatq.server.chatq_server.service.QueryService;
+import kr.chatq.server.chatq_server.service.ChatqLogService;
 import kr.chatq.server.chatq_server.dto.ColumnDto;
+import kr.chatq.server.chatq_server.entity.QueryTopic;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +36,9 @@ public class QueryController {
 
     @Autowired
     private QueryService queryService;
+
+    @Autowired
+    private ChatqLogService chatqLogService;
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(QueryController.class);
 
@@ -78,9 +83,54 @@ public class QueryController {
                     request.getHeaderColumns(),
                     request.getLastColumns(),
                     request.getCodeMaps());
+            
+            // tableAlias가 없는 경우 chatqtopic 저장
+            if ((request.getTableAlias() == null || request.getTableAlias().isEmpty()) 
+                && request.getTopicId() > 0 && response.getTableAlias() != null) {
+                chatqLogService.saveChatqTopic(request.getTopicId(), request.getPrompt(), response.getTableAlias());
+            }
+            
+            // chatqlog 테이블에 로그 저장 또는 업데이트
+            if (request.getId() > 0) {
+                // id가 있으면 response만 업데이트
+                chatqLogService.updateResponse(request.getId(), response);
+                response.setId(request.getId());
+            } else if (request.getTopicId() > 0) {
+                // id가 없고 topicId가 있으면 새로 저장
+                int logId = chatqLogService.saveChatqLog(request.getTopicId(), request, response);
+                response.setId(logId);
+            }
+            
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Error executing chat query: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/logs/{topicId}")
+    public ResponseEntity<List<Map<String, Object>>> getLogs(@PathVariable long topicId, HttpSession session) {
+        try {
+            List<Map<String, Object>> logs = chatqLogService.getChatqLogsByTopicId(topicId);
+            return ResponseEntity.ok(logs);
+        } catch (Exception e) {
+            logger.error("Error fetching logs for topic {}: {}", topicId, e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/topics")
+    public ResponseEntity<List<QueryTopic>> getTopics(@RequestBody Map<String, Object> request) {
+        try {
+            Long lastTopicId = request.get("lastTopicId") != null ? 
+                ((Number) request.get("lastTopicId")).longValue() : null;
+            Integer limit = request.get("limit") != null ? 
+                ((Number) request.get("limit")).intValue() : 20;
+            
+            List<QueryTopic> topics = chatqLogService.getChatqTopics(lastTopicId, limit);
+            return ResponseEntity.ok(topics);
+        } catch (Exception e) {
+            logger.error("Error fetching topics: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
         }
     }
@@ -105,7 +155,7 @@ public class QueryController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Login exception for user {}: {}", request.getUser(), e.getMessage(), e);
-            LoginResponse response = new LoginResponse("FAIL", null, null, 9, null, null, null, null, 0);
+            LoginResponse response = new LoginResponse("FAIL", null, null, 9, null, null, null, null, 0, null);
             return ResponseEntity.ok(response);
         }
     }

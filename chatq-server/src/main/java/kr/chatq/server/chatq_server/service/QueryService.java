@@ -4,6 +4,7 @@ import kr.chatq.server.chatq_server.dto.AuthDto;
 import kr.chatq.server.chatq_server.dto.LoginResponse;
 import kr.chatq.server.chatq_server.dto.QueryResponse;
 import kr.chatq.server.chatq_server.dto.UserDto;
+import kr.chatq.server.chatq_server.entity.QueryTopic;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
@@ -126,6 +127,10 @@ public class QueryService {
     @Value("${chatq.query.post_query:}")
     private String postQuery;
 
+    // Topics limit
+    @Value("${chatq.topics.limit:20}")
+    private Integer topicsLimit;
+
     private static final int GCM_TAG_LENGTH = 128; // bits
     private static final int IV_LENGTH = 12; // bytes
 
@@ -151,6 +156,9 @@ public class QueryService {
 
     @Autowired
     private EmbeddingService embeddingService;
+
+    @Autowired
+    private ChatqLogService chatqLogService;
 
     // Spring이 ChatModel (Ollama 또는 기본 ChatModel) 빈을 찾아서 주입
     public QueryService(OllamaChatModel chatModel, OpenAiChatModel openAiChatModel) {
@@ -778,7 +786,7 @@ public class QueryService {
         List<Map<String, Object>> rows = dbService.getUsers(user);
         if (rows.isEmpty()) {
             logger.warn("Login failed: User not found: {}", user);
-            return new LoginResponse("FAIL", null, null, 9, null, null, null, null, 0);
+            return new LoginResponse("FAIL", null, null, 9, null, null, null, null, 0, null);
         }
 
         Map<String, Object> userInfo = rows.get(0);
@@ -786,7 +794,7 @@ public class QueryService {
         if (!user.equals("admin") && (hashedPassword == null || !matchesPwd(password, hashedPassword))) {
             // 비밀번호 불일치
             logger.warn("Login failed: Password mismatch for user: {}", user);
-            return new LoginResponse("FAIL", null, null, 9, null, null, null, null, 0);
+            return new LoginResponse("FAIL", null, null, 9, null, null, null, null, 0, null);
         }
 
         logger.info("Login success for user: {}", user);
@@ -829,6 +837,10 @@ public class QueryService {
         if(useEmbedding){
             embeddingService.checkMemeDB(company);
         }
+
+        // topics 조회
+        List<QueryTopic> topics = chatqLogService.getChatqTopics(null, topicsLimit);
+
         // 4) 로그인 성공 응답 반환
         return new LoginResponse(
                 "SUCCESS",
@@ -839,7 +851,8 @@ public class QueryService {
                 userName,
                 pwdFiredYn,
                 infoColumns, 
-                autoLogoutSec);
+                autoLogoutSec,
+                topics);
     }
 
     /**
@@ -1174,7 +1187,7 @@ public class QueryService {
      */
     public LoginResponse checkSession(HttpSession session) {
         if (session == null) {
-            return new LoginResponse("FAIL", null, null, 9, null, null, null, null, 0);
+            return new LoginResponse("FAIL", null, null, 9, null, null, null, null, 0, null);
         }
         String user = (String) session.getAttribute("USER");
         String auth = (String) session.getAttribute("AUTH");
@@ -1187,7 +1200,11 @@ public class QueryService {
         String userName = (String) session.getAttribute("USER_NM");
         if (level == null)
             level = 9;
-        return new LoginResponse("SUCCESS", auth, infos, level, user, userName, null, infoColumns, autoLogoutSec);
+        
+        // topics 조회
+        List<QueryTopic> topics = chatqLogService.getChatqTopics(null, topicsLimit);
+        
+        return new LoginResponse("SUCCESS", auth, infos, level, user, userName, null, infoColumns, autoLogoutSec, topics);
     }
 
     /**

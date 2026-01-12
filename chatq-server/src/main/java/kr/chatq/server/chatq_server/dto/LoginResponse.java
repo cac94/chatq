@@ -1,5 +1,6 @@
 package kr.chatq.server.chatq_server.dto;
 
+import kr.chatq.server.chatq_server.entity.QueryTopic;
 import java.util.List;
 import java.util.Map;
 
@@ -13,11 +14,12 @@ public class LoginResponse {
     private String pwdFiredYn;
     private Map<String, List<String>> infoColumns;
     private int autoLogoutSec;
+    private List<QueryTopic> topics;
 
     public LoginResponse() {
     }
 
-    public LoginResponse(String message, String auth, List<String> infos, int level, String user, String user_nm, String pwdFiredYn, Map<String, List<String>> infoColumns, int autoLogoutSec) {
+    public LoginResponse(String message, String auth, List<String> infos, int level, String user, String user_nm, String pwdFiredYn, Map<String, List<String>> infoColumns, int autoLogoutSec, List<QueryTopic> topics) {
         this.message = message;
         this.auth = auth;
         this.infos = infos;
@@ -27,6 +29,7 @@ public class LoginResponse {
         this.pwdFiredYn = pwdFiredYn;
         this.infoColumns = infoColumns;
         this.autoLogoutSec = autoLogoutSec;
+        this.topics = topics;
     }
     public String getUser() {
         return user;
@@ -98,5 +101,13 @@ public class LoginResponse {
 
     public void setAutoLogoutSec(int autoLogoutSec) {
         this.autoLogoutSec = autoLogoutSec;
+    }
+
+    public List<QueryTopic> getTopics() {
+        return topics;
+    }
+
+    public void setTopics(List<QueryTopic> topics) {
+        this.topics = topics;
     }
 }

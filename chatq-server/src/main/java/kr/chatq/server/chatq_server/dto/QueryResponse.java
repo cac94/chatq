@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 public class QueryResponse {
+    private int id;
     private List<String> columns;
     private List<Map<String, Object>> data;
     private List<String> headerColumns;
@@ -129,5 +130,13 @@ public class QueryResponse {
 
     public void setCodeMaps(Map<String, String> codeMaps) {
         this.codeMaps = codeMaps;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
     }
 }
