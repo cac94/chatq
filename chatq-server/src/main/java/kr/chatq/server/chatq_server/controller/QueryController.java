@@ -85,7 +85,7 @@ public class QueryController {
                     request.getCodeMaps());
             
             // tableAlias가 없는 경우 chatqtopic 저장
-            if ((request.getTableAlias() == null || request.getTableAlias().isEmpty()) 
+            if ((request.getLastQuery() == null || request.getLastQuery().isEmpty()) 
                 && request.getTopicId() > 0 && response.getTableAlias() != null) {
                 chatqLogService.saveChatqTopic(request.getTopicId(), request.getPrompt(), response.getTableAlias());
             }

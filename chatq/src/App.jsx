@@ -47,6 +47,7 @@ const App = () => {
   const [confirmCallback, setConfirmCallback] = useState(null)
   const [confirmMessage, setConfirmMessage] = useState('')
   const [isListening, setIsListening] = useState(false)
+  const [isLoginLoading, setIsLoginLoading] = useState(false)
   const bottomRef = useRef(null)
   const inputContainerRef = useRef(null)
   const recognitionRef = useRef(null)
@@ -67,8 +68,11 @@ const App = () => {
   const [selectedInfo, setSelectedInfo] = useState('')
   const [autoLogoutSec, setAutoLogoutSec] = useState(0)
   const autoLogoutTimerRef = useRef(null)
+  const [isLoadingTopics, setIsLoadingTopics] = useState(false)
+  const [hasMoreTopics, setHasMoreTopics] = useState(true)
+  const topicsSidebarRef = useRef(null)
 
-  const handleResetSession = () => {
+  const clearSessionState = () => {
     setGrids([])
     setLastQuery(null)
     setTableQuery(null)
@@ -77,6 +81,10 @@ const App = () => {
     setTableAlias(null)
     setHeaderColumns(null)
     setLastColumns(null)
+  }
+
+  const handleResetSession = () => {
+    clearSessionState()
     // Start a new ChatQ session
     const newId = Date.now()
     setSessions(prev => [...prev, { id: newId, firstQuery: null, tableAlias: null, startedAt: new Date() }])
@@ -94,24 +102,19 @@ const App = () => {
   const handleLogout = async (isAutoLogout = false) => {
     try {
       await axios.post('/api/logout')
+      clearSessionState()
       setAuth(null)
       setUser(null)
       setInfos(null)
       setInfoColumns(null)
       setLevel(null)
       setUserNm(null)
-      setGrids([])
-      setLastQuery(null)
-      setTableQuery(null)
-      setLastDetailYn(null)
-      setTableName(null)
-      setTableAlias(null)
-      setHeaderColumns(null)
-      setLastColumns(null)
       setSessions([])
       setCurrentSessionId(null)
       setSelectedInfo('')
       setAutoLogoutSec(0)
+      setIsLoadingTopics(false)
+      setHasMoreTopics(true)
       if (autoLogoutTimerRef.current) {
         clearTimeout(autoLogoutTimerRef.current)
       }
@@ -145,12 +148,50 @@ const App = () => {
     }
   }
 
+  // 추가 topics 로드 함수
+  const loadMoreTopics = async () => {
+    if (isLoadingTopics || !hasMoreTopics || !user) return
+
+    setIsLoadingTopics(true)
+    try {
+      const backendSessions = sessions.filter(s => s.isFromBackend)
+      const lastTopicId = backendSessions.length > 0 
+        ? Math.min(...backendSessions.map(s => s.id))
+        : null
+
+      const response = await axios.post('/api/topics', {
+        lastTopicId: lastTopicId,
+        limit: 20
+      })
+
+      if (response.data && response.data.length > 0) {
+        const newTopicSessions = response.data.map(topic => ({
+          id: topic.topicId,
+          firstQuery: topic.firstQuery,
+          tableAlias: topic.tableAlias,
+          startedAt: new Date(topic.startedAt || topic.addDate + ' ' + topic.addTime),
+          isFromBackend: true
+        }))
+        
+        setSessions(prev => [...prev, ...newTopicSessions])
+        setHasMoreTopics(response.data.length >= 20)
+      } else {
+        setHasMoreTopics(false)
+      }
+    } catch (error) {
+      console.error('Error loading more topics:', error)
+    } finally {
+      setIsLoadingTopics(false)
+    }
+  }
+
   const handleLogin = async (e) => {
     e.preventDefault()
     const formData = new FormData(e.target)
     const username = formData.get('username')
     const password = formData.get('password')
 
+    setIsLoginLoading(true)
     try {
       const response = await axios.post('/api/login', {
         user: username,
@@ -174,6 +215,21 @@ const App = () => {
       setUser(response.data.user || username)
       setSelectedInfo('')
       setAutoLogoutSec(response.data.autoLogoutSec || 0)
+      
+      // topics를 sessions에 추가 (QueryTopic entity 구조 참고)
+      if (response.data.topics && response.data.topics.length > 0) {
+        const topicSessions = response.data.topics.map(topic => ({
+          id: topic.topicId,
+          firstQuery: topic.firstQuery,
+          tableAlias: topic.tableAlias,
+          startedAt: new Date(topic.startedAt || topic.addDate + ' ' + topic.addTime),
+          isFromBackend: true // 백엔드에서 받은 topic임을 표시
+        }))
+        setSessions(topicSessions)
+        setHasMoreTopics(true)
+      } else {
+        setHasMoreTopics(false)
+      }
 
       setShowLoginModal(false)
       // 비밀번호 초기화 상태면 안내 메시지와 함께 사용자정보 모달 오픈
@@ -190,6 +246,8 @@ const App = () => {
       console.error('Login Error:', error)
       setAlertMessage(translations[language].loginFail)
       setShowAlert(true)
+    } finally {
+      setIsLoginLoading(false)
     }
   }
 
@@ -226,6 +284,10 @@ const App = () => {
         const postData = {
           prompt: effectivePrompt
         }
+        
+        // currentSessionId에 해당하는 세션의 topicId 추가
+        postData.topicId = currentSessionId
+        
         if (!ignoreContext) {
           if (lastQuery) postData.lastQuery = lastQuery
           if (tableQuery) postData.tableQuery = tableQuery
@@ -254,7 +316,8 @@ const App = () => {
 
         // 새로 생성된 그리드 객체 저장
         const newGrid = {
-          id: Date.now(),
+          request: postData,
+          id: response.data.id || Date.now(),
           query: effectivePrompt,
           data: response.data.data,
           columns: columns,
@@ -307,13 +370,75 @@ const App = () => {
   const handleReplay = (session) => {
     if (!session || !session.firstQuery) return
     // Reset conversation state
-    const newId = handleResetSession()
-    setQuery(session.firstQuery)
-    // Restore the saved tableAlias (search target)
-    if (session.tableAlias) {
-      setSelectedInfo(session.tableAlias)
+    clearSessionState()
+    setCurrentSessionId(session.id)
+
+    // get logs for the topic from backend and set grids
+    const runReplay = async () => {
+      setIsLoading(true)
+      try {
+        const response = await axios.get('/api/logs/' + session.id)
+        
+        if (response.data && response.data.length > 0) {
+          const newGrids = response.data.map(log => {
+            // JSON 문자열을 객체로 변환
+            const logResponse = log.response ? (typeof log.response === 'string' ? JSON.parse(log.response) : log.response) : {}
+            const logRequest = log.request ? (typeof log.request === 'string' ? JSON.parse(log.request) : log.request) : {}
+            
+            const columns = logResponse.columns ? logResponse.columns.map(col => ({
+              key: col,
+              label: col.charAt(0).toUpperCase() + col.slice(1)
+            })) : []
+            
+            const headerColumns = logResponse.headerColumns ? logResponse.headerColumns.map(col => ({
+              key: col,
+              label: col.charAt(0).toUpperCase() + col.slice(1)
+            })) : []
+            
+            return {
+              request: logRequest,
+              id: logResponse.id || Date.now(),
+              query: logRequest.prompt || '',
+              data: logResponse.data || [],
+              columns: columns,
+              headerColumns: headerColumns,
+              headerData: logResponse.headerData || [],
+              detailYn: logResponse.detailYn || 'N',
+              showDetail: false
+            }
+          })
+          
+          setGrids(newGrids)
+          
+          // 마지막 로그의 response로 컨텍스트 정보 상태 업데이트
+          const lastLog = response.data[response.data.length - 1]
+          if (lastLog && lastLog.response) {
+            const lastResponse = typeof lastLog.response === 'string' ? JSON.parse(lastLog.response) : lastLog.response
+            setLastQuery(lastResponse.lastQuery || null)
+            setTableQuery(lastResponse.tableQuery || null)
+            setLastDetailYn(lastResponse.lastDetailYn || null)
+            setTableName(lastResponse.tableName || null)
+            setTableAlias(lastResponse.tableAlias || null)
+            if (lastResponse.tableAlias) {
+              setSelectedInfo(lastResponse.tableAlias)
+            }
+            if (lastResponse.headerColumns && lastResponse.headerColumns.length > 0) {
+              setHeaderColumns(lastResponse.headerColumns)
+            }
+            setLastColumns(lastResponse.lastColumns || null)
+            setCodeMaps(lastResponse.codeMaps || null)
+          }
+        }
+      } catch (error) {
+        console.error('Error loading logs:', error)
+        setAlertMessage(translations[language].apiError || 'Failed to load conversation history')
+        setShowAlert(true)
+      } finally {
+        setIsLoading(false)
+      }
     }
-    handleSend(session.firstQuery, newId, true, session.tableAlias)
+    
+    runReplay()
   }
 
   // 차트 생성 공통 함수
@@ -563,6 +688,21 @@ const App = () => {
           setUserNm(response.data.user_nm || null)
           setUser(response.data.user)
           setAutoLogoutSec(response.data.autoLogoutSec || 0)
+          
+          // topics 로드
+          if (response.data.topics && response.data.topics.length > 0) {
+            const topicSessions = response.data.topics.map(topic => ({
+              id: topic.topicId,
+              firstQuery: topic.firstQuery,
+              tableAlias: topic.tableAlias,
+              startedAt: new Date(topic.startedAt || topic.addDate + ' ' + topic.addTime),
+              isFromBackend: true
+            }))
+            setSessions(topicSessions)
+            setHasMoreTopics(true)
+          } else {
+            setHasMoreTopics(false)
+          }
         }
       } catch (error) {
         console.log('No active session')
@@ -913,7 +1053,17 @@ const App = () => {
           </div>
         </div>
         {/* Right sidebar - ChatQ topics */}
-        <aside className="hidden md:block w-64 bg-slate-950 overflow-y-auto flex-shrink-0">
+        <aside 
+          ref={topicsSidebarRef}
+          onScroll={(e) => {
+            const element = e.target
+            const bottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 50
+            if (bottom && hasMoreTopics && !isLoadingTopics) {
+              loadMoreTopics()
+            }
+          }}
+          className="hidden md:block w-64 bg-slate-950 overflow-y-auto flex-shrink-0"
+        >
           <div className="p-4">
             <h2 className="text-slate-400 text-sm font-semibold mb-3">{translations[language].myChatQTopics}</h2>
             <ul className="space-y-2 pr-1">
@@ -943,6 +1093,11 @@ const App = () => {
                     </div>
                   </li>
                 ))}
+              {isLoadingTopics && (
+                <li className="text-center py-2">
+                  <span className="text-slate-500 text-xs">Loading...</span>
+                </li>
+              )}
             </ul>
           </div>
         </aside>
@@ -956,6 +1111,7 @@ const App = () => {
         onSubmit={handleLogin}
         language={language}
         translations={translations}
+        isLoading={isLoginLoading}
       />
 
       {/* Alert Modal */}
