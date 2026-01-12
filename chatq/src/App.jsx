@@ -285,8 +285,12 @@ const App = () => {
           prompt: effectivePrompt
         }
         
-        // currentSessionId에 해당하는 세션의 topicId 추가
-        postData.topicId = currentSessionId
+
+        // Set firstQuery and tableAlias for session if absent (supports replay where session id provided directly)
+        const targetSessionId = sessionIdForFirstQuery !== null ? sessionIdForFirstQuery : currentSessionId
+
+        // topicId 추가
+        postData.topicId = targetSessionId
         
         if (!ignoreContext) {
           if (lastQuery) postData.lastQuery = lastQuery
@@ -328,9 +332,6 @@ const App = () => {
         }
         
         setGrids(prevGrids => [...prevGrids, newGrid])
-
-        // Set firstQuery and tableAlias for session if absent (supports replay where session id provided directly)
-        const targetSessionId = sessionIdForFirstQuery !== null ? sessionIdForFirstQuery : currentSessionId
         setSessions(prev => prev.map(s => {
           if (s.id === targetSessionId && !s.firstQuery) {
             return { ...s, firstQuery: effectivePrompt, tableAlias: response.data.tableAlias || null }
