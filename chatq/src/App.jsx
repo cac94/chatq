@@ -230,7 +230,7 @@ const App = () => {
       } else {
         setHasMoreTopics(false)
       }
-
+      handleResetSession()
       setShowLoginModal(false)
       // 비밀번호 초기화 상태면 안내 메시지와 함께 사용자정보 모달 오픈
       const pwdFiredYn = response.data.pwdFiredYn ?? response.data.pwd_fired_yn
@@ -711,15 +711,6 @@ const App = () => {
     }
     checkSession()
   }, [])
-
-  // Initialize first session on mount if absent
-  useEffect(() => {
-    if (sessions.length === 0) {
-      const newId = Date.now()
-      setSessions([{ id: newId, firstQuery: null, tableAlias: null, startedAt: new Date() }])
-      setCurrentSessionId(newId)
-    }
-  }, [sessions.length])
 
   // After alert is closed, open UserInfoModal if requested
   useEffect(() => {
