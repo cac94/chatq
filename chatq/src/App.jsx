@@ -367,6 +367,26 @@ const App = () => {
     }
   }
 
+  // Delete a topic
+  const handleDeleteTopic = async (topicId, event) => {
+    event.stopPropagation() // 이벤트 버블링 방지
+    
+    try {
+      await axios.delete(`/api/topics/${topicId}`)
+      // sessions에서 해당 topic 제거
+      setSessions(prev => prev.filter(s => s.id !== topicId))
+      
+      // 현재 보고 있는 세션이 삭제된 경우 초기화
+      if (currentSessionId === topicId) {
+        handleResetSession()
+      }
+    } catch (error) {
+      console.error('Error deleting topic:', error)
+      setAlertMessage(translations[language].apiError || 'Failed to delete topic')
+      setShowAlert(true)
+    }
+  }
+
   // Replay a previous session's first query by starting a new session and auto-running it
   const handleReplay = (session) => {
     if (!session || !session.firstQuery) return
@@ -1047,14 +1067,7 @@ const App = () => {
         {/* Right sidebar - ChatQ topics */}
         <aside 
           ref={topicsSidebarRef}
-          onScroll={(e) => {
-            const element = e.target
-            const bottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 50
-            if (bottom && hasMoreTopics && !isLoadingTopics) {
-              loadMoreTopics()
-            }
-          }}
-          className="hidden md:block w-64 bg-slate-950 overflow-y-auto flex-shrink-0"
+          className="hidden md:block w-64 bg-slate-950 overflow-hidden flex-shrink-0"
         >
           <div className="p-4">
             <h2 className="text-slate-400 text-sm font-semibold mb-3">{translations[language].myChatQTopics}</h2>
@@ -1067,18 +1080,32 @@ const App = () => {
                 .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
                 .map(s => (
                   <li key={s.id} className="group relative">
-                    <button
-                      type="button"
-                      onClick={() => handleReplay(s)}
-                      className="w-full text-left text-xs text-slate-300 hover:bg-slate-800/60 rounded px-1 py-1"
-                      title={`${translations[language].replay}: ${s.firstQuery}`}
-                    >
-                      <span
-                        className="block w-full px-2 py-1 rounded bg-slate-800/70 group-hover:bg-slate-700/70 transition-colors overflow-hidden whitespace-nowrap text-ellipsis"
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleReplay(s)}
+                        className="flex-1 min-w-0 text-left text-xs text-slate-300 hover:bg-slate-800/60 rounded px-1 py-1"
+                        title={`${translations[language].replay}: ${s.firstQuery}`}
                       >
-                        {s.tableAlias ? `[${s.tableAlias}] ${s.firstQuery}` : s.firstQuery}
-                      </span>
-                    </button>
+                        <span
+                          className="block w-full px-2 py-1 rounded bg-slate-800/70 group-hover:bg-slate-700/70 transition-colors overflow-hidden whitespace-nowrap text-ellipsis"
+                        >
+                          {s.tableAlias ? `[${s.tableAlias}] ${s.firstQuery}` : s.firstQuery}
+                        </span>
+                      </button>
+                      {s.isFromBackend && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteTopic(s.id, e)}
+                          className="flex-shrink-0 p-1 text-slate-500 hover:text-red-500 hover:bg-slate-800 rounded transition-colors"
+                          title="Delete topic"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                     {/* Hover full content tooltip */}
                     <div className="pointer-events-none absolute left-0 top-full mt-1 z-10 hidden group-hover:block bg-slate-800 text-slate-200 text-xs p-2 rounded shadow-lg max-w-xs whitespace-pre-wrap break-words">
                       {s.tableAlias ? `[${s.tableAlias}] ${s.firstQuery}` : s.firstQuery}

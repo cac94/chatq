@@ -210,6 +210,31 @@ public class ChatqLogService {
     }
 
     /**
+     * chatqtopic 삭제 (해당 topic에 연결된 chatqlog도 함께 삭제)
+     * @param topicId 삭제할 topic_id
+     */
+    public void deleteChatqTopic(long topicId) {
+        try {
+            String company = CompanyContext.getCompany();
+            String user = getCurrentUser();
+            
+            // 먼저 해당 topic의 모든 로그 삭제
+            String deleteLogsSql = "DELETE FROM chatqlog WHERE company = ? AND user = ? AND topic_id = ?";
+            int deletedLogs = jdbcTemplate.update(deleteLogsSql, company, user, topicId);
+            
+            // 그 다음 topic 삭제
+            String deleteTopicSql = "DELETE FROM chatqtopic WHERE company = ? AND user = ? AND topic_id = ?";
+            int deletedTopics = jdbcTemplate.update(deleteTopicSql, company, user, topicId);
+            
+            logger.info("Deleted chatq topic - company: {}, user: {}, topic_id: {}, deleted logs: {}, deleted topics: {}", 
+                       company, user, topicId, deletedLogs, deletedTopics);
+        } catch (Exception e) {
+            logger.error("Error deleting chatq topic {}: {}", topicId, e.getMessage(), e);
+            throw new RuntimeException("Failed to delete topic: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * 세션에서 현재 사용자 정보 가져오기
      */
     private String getCurrentUser() {

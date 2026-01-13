@@ -135,6 +135,17 @@ public class QueryController {
         }
     }
 
+    @DeleteMapping("/topics/{topicId}")
+    public ResponseEntity<Void> deleteTopic(@PathVariable long topicId) {
+        try {
+            chatqLogService.deleteChatqTopic(topicId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            logger.error("Error deleting topic {}: {}", topicId, e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @PostMapping("/new")
     public ResponseEntity<QueryResponse> executeNewChat(@RequestBody QueryRequest request) {
         try {
